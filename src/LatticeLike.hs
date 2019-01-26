@@ -3,6 +3,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DerivingVia #-}
 module LatticeLike(
   Zippable(..),
   Align(..),
@@ -12,8 +13,10 @@ module LatticeLike(
 
   Threeway(..),
   Pentagon(..),
+  R(..),
 
-  checkLatticeLike, checkZipUnit, checkAlignUnit
+  checkLatticeLike, checkZipUnit, checkAlignUnit,
+  main
 ) where
 
 import           Prelude               hiding (repeat, zip)
@@ -36,7 +39,7 @@ import           Data.Functor.Product
 import           Data.Tuple            (swap)
 import           Data.Proxy
 
-import AutoLiftShow
+import AutoLift
 
 import Test.QuickCheck
 
@@ -182,6 +185,7 @@ instance (Bottom f, Align g) => Bottom (Compose f g) where
 
 data Threeway a = None | One a | Two a a
   deriving (Show, Eq, Functor, Foldable, Traversable)
+  deriving Show1 via (Reflected1 Threeway)
 
 instance Zippable Threeway where
   zip None       _          = None
@@ -206,10 +210,6 @@ instance Top Threeway where
 
 instance Bottom Threeway where
   nil = None
-
-instance Show1 Threeway where
-  liftShowsPrec = autoLiftShowsPrec showsPrec
-  liftShowList = autoLiftShowList showList
 
 instance Eq1 Threeway where
   liftEq _ None None = True
@@ -241,6 +241,7 @@ instance Arbitrary1 Threeway where
 
 data Pentagon a = D0 | D1 a | D2 a | D3 a | D4 a a
   deriving (Show, Eq, Functor, Foldable, Traversable)
+  deriving (Show1) via (Reflected1 Pentagon)
 
 instance Zippable Pentagon where
   zip D0        _         = D0
@@ -290,10 +291,6 @@ instance Top Pentagon where
 instance Bottom Pentagon where
   nil = D0
 
-instance Show1 Pentagon where
-  liftShowsPrec = autoLiftShowsPrec showsPrec
-  liftShowList = autoLiftShowList showList
-
 instance Eq1 Pentagon where
   liftEq _ D0 D0 = True
   liftEq eqV (D1 a) (D1 b) = eqV a b
@@ -320,6 +317,7 @@ instance Arbitrary1 Pentagon where
 
 newtype R a = Nest [[a]]
   deriving (Show, Eq, Functor, Foldable, Traversable)
+  deriving (Show1) via (Reflected1 R)
 
 instance Zippable R where
   zip (Nest ass) (Nest bss) = Nest $ zipR ass bss
@@ -356,13 +354,20 @@ instance LatticeLike R
 instance Bottom R where
   nil = Nest []
 
+instance Eq1 R where
+  liftEq eq (Nest ass) (Nest bss) = liftEq (liftEq eq) ass bss
+
 instance Arbitrary a => Arbitrary (R a) where
   arbitrary = arbitrary1
   shrink = shrink1
 
 instance Arbitrary1 R where
-  liftArbitrary gen = Nest <$> liftArbitrary (liftArbitrary gen)
+  liftArbitrary gen = Nest <$>
+    (scale sqrti $ liftArbitrary (liftArbitrary gen))
   liftShrink s (Nest ass) = Nest <$> liftShrink (liftShrink s) ass
+
+sqrti :: Int -> Int
+sqrti = round . (sqrt :: Double -> Double) . fromIntegral
 
 ---- Checks ----
 
@@ -430,6 +435,9 @@ propAlignToList _ xs ys =
      .&&.
      (F.toList ys === mapMaybe sndT (F.toList xys))
 
+qc :: Testable prop => prop -> IO ()
+qc = quickCheckWith stdArgs{ maxSuccess = 500, maxSize = 100 }
+
 checkLatticeLike
   :: forall f. (LatticeLike f
                , Foldable f
@@ -439,26 +447,26 @@ checkLatticeLike
   => Proxy f -> IO ()
 checkLatticeLike al =
   do putStr "<zipIdempotence> "
-     quickCheck $ propIdempotenceP al
+     qc $ propIdempotenceP al
      putStr "<zipCommutative> "
-     quickCheck $ propCommutativeP al
+     qc $ propCommutativeP al
      putStr "<zipAssociative> "
-     quickCheck $ propAssociativeP al
+     qc $ propAssociativeP al
      
      putStr "<alignIdempotence> "
-     quickCheck $ propIdempotenceT al
+     qc $ propIdempotenceT al
      putStr "<alignCommutative> "
-     quickCheck $ propCommutativeT al
+     qc $ propCommutativeT al
      putStr "<alignAssociative> "
-     quickCheck $ propAssociativeT al
+     qc $ propAssociativeT al
 
-     putStr "<absorptionPT>"
-     quickCheck $ propAbsorptionPT al
-     putStr "<absorptionTP>"
-     quickCheck $ propAbsorptionTP al
+     putStr "<absorptionPT> "
+     qc $ propAbsorptionPT al
+     putStr "<absorptionTP> "
+     qc $ propAbsorptionTP al
 
-     putStr "<alignToList>"
-     quickCheck $ propAlignToList al
+     putStr "<alignToList> "
+     qc $ propAlignToList al
 
 checkZipUnit 
   :: forall f. (Top f
@@ -468,9 +476,8 @@ checkZipUnit
   => Proxy f -> IO ()
 checkZipUnit al =
   do putStr "<zipUnit>"
-     quickCheck $ propUnitP al
+     qc $ propUnitP al
 
-     
 checkAlignUnit 
   :: forall f. (Bottom f
                , forall a. Show a => Show (f a)
@@ -479,4 +486,40 @@ checkAlignUnit
   => Proxy f -> IO ()
 checkAlignUnit al =
   do putStr "<alignUnit>"
-     quickCheck $ propUnitT al
+     qc $ propUnitT al
+
+------
+
+main :: IO ()
+main = do
+  putStrLn "### Maybe ###"
+  checkLatticeLike (Proxy :: Proxy Maybe)
+  checkZipUnit (Proxy :: Proxy Maybe)
+  checkAlignUnit (Proxy :: Proxy Maybe)
+  putStrLn "### [] ###"
+  checkLatticeLike (Proxy :: Proxy [])
+  checkZipUnit (Proxy :: Proxy [])
+  checkAlignUnit (Proxy :: Proxy [])
+  putStrLn "### Map Int ###"
+  checkLatticeLike (Proxy :: Proxy (Map Int))
+  checkAlignUnit (Proxy :: Proxy (Map Int))
+  putStrLn "### Product Maybe [] ###"
+  checkLatticeLike (Proxy :: Proxy (Product Maybe []))
+  checkZipUnit (Proxy :: Proxy (Product Maybe []))
+  checkAlignUnit (Proxy :: Proxy (Product Maybe []))
+  putStrLn "### Compose [] Maybe ###"
+  checkLatticeLike (Proxy :: Proxy (Compose [] Maybe))
+  checkZipUnit (Proxy :: Proxy (Compose [] Maybe))
+  checkAlignUnit (Proxy :: Proxy (Compose [] Maybe))
+  putStrLn "### Threeway ###"
+  checkLatticeLike (Proxy :: Proxy Threeway)
+  checkZipUnit (Proxy :: Proxy Threeway)
+  checkAlignUnit (Proxy :: Proxy Threeway)
+  putStrLn "### Pentagon ###"
+  checkLatticeLike (Proxy :: Proxy Pentagon)
+  checkZipUnit (Proxy :: Proxy Pentagon)
+  checkAlignUnit (Proxy :: Proxy Pentagon)
+  putStrLn "### R ###"
+  checkLatticeLike (Proxy :: Proxy R)
+  checkAlignUnit (Proxy :: Proxy R)
+
