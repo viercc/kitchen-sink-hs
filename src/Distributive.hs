@@ -25,7 +25,7 @@ class Functor g => Distributive g where
   -- fmap distribute . collect f = getCompose . collect (Compose . f)
 
 instance Distributive ((->) r) where
-  distribute f r = fmap ($r) f
+  distribute f r = fmap ($ r) f
 
 instance Distributive Id where
   distribute = Id . fmap runId
