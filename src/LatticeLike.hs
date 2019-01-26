@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE QuantifiedConstraints #-}
@@ -24,6 +24,8 @@ import           Control.Applicative
 import qualified Data.Align            as Al
 import           Data.Functor.Classes
 import           Data.These
+import           Data.Maybe (mapMaybe)
+import qualified Data.Foldable         as F
 
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -92,6 +94,9 @@ fstT :: These a b -> Maybe a
 fstT (This a)    = Just a
 fstT (That _)    = Nothing
 fstT (These a _) = Just a
+
+sndT :: These a b -> Maybe b
+sndT = fstT . swapT
 
 ---- Instances ----
 
@@ -176,7 +181,7 @@ instance (Bottom f, Align g) => Bottom (Compose f g) where
 -}
 
 data Threeway a = None | One a | Two a a
-  deriving (Show, Eq, Functor)
+  deriving (Show, Eq, Functor, Foldable, Traversable)
 
 instance Zippable Threeway where
   zip None       _          = None
@@ -235,7 +240,7 @@ instance Arbitrary1 Threeway where
 -}
 
 data Pentagon a = D0 | D1 a | D2 a | D3 a | D4 a a
-  deriving (Show, Eq, Functor)
+  deriving (Show, Eq, Functor, Foldable, Traversable)
 
 instance Zippable Pentagon where
   zip D0        _         = D0
@@ -313,6 +318,52 @@ instance Arbitrary1 Pentagon where
   liftShrink s (D3 a) = D3 <$> s a
   liftShrink s (D4 a a') = (D4 a <$> s a') ++ (D4 <$> s a <*> pure a')
 
+newtype R a = Nest [[a]]
+  deriving (Show, Eq, Functor, Foldable, Traversable)
+
+instance Zippable R where
+  zip (Nest ass) (Nest bss) = Nest $ zipR ass bss
+    where
+      zipR []   _     = []
+      zipR _    []    = []
+      zipR [xs] [ys]  = [zip xs ys]
+      zipR xss  [ys] | sum (length <$> xss) <= length ys = aux xss ys
+      zipR [xs] yss  | sum (length <$> yss) <= length xs = fmap (fmap swap) (aux yss xs)
+      zipR xss  yss  | shape xss == shape yss            = zipWith zip xss yss
+                     | otherwise                         = []
+      
+      shape = fmap length
+      aux [] _ = []
+      aux ([]:xss) ys = [] : aux xss ys
+      aux ((x:xs):xss) ys =
+        case ys of
+          [] -> error "Should never happen!"
+          (y:ys') -> case aux (xs:xss) ys' of
+            [] -> error "Should never happen!"
+            (zs:zss) -> ((x,y):zs):zss
+
+instance Align R where
+  align (Nest ass) (Nest bss)
+    | null ass                = That <$> Nest bss
+    | null bss                = This <$> Nest ass
+    | shape ass == shape bss  = Nest $ zipWith (zipWith These) ass bss
+    | otherwise               = Nest [align (concat ass) (concat bss)] 
+    where
+      shape = fmap (() <$)
+
+instance LatticeLike R
+
+instance Bottom R where
+  nil = Nest []
+
+instance Arbitrary a => Arbitrary (R a) where
+  arbitrary = arbitrary1
+  shrink = shrink1
+
+instance Arbitrary1 R where
+  liftArbitrary gen = Nest <$> liftArbitrary (liftArbitrary gen)
+  liftShrink s (Nest ass) = Nest <$> liftShrink (liftShrink s) ass
+
 ---- Checks ----
 
 propIdempotenceP
@@ -370,8 +421,18 @@ propAbsorptionTP
   => Proxy f -> f Bool -> f Int -> Property
 propAbsorptionTP _ xs ys = (fstT <$> align xs (zip xs ys)) === (Just <$> xs)
 
+propAlignToList
+  :: forall f. (Align f, Foldable f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  => Proxy f -> f Int -> f Int -> Property
+propAlignToList _ xs ys =
+  let xys = align xs ys
+  in (F.toList xs === mapMaybe fstT (F.toList xys))
+     .&&.
+     (F.toList ys === mapMaybe sndT (F.toList xys))
+
 checkLatticeLike
   :: forall f. (LatticeLike f
+               , Foldable f
                , forall a. Show a => Show (f a)
                , forall a. Eq a => Eq (f a)
                , forall a. Arbitrary a => Arbitrary (f a))
@@ -395,6 +456,9 @@ checkLatticeLike al =
      quickCheck $ propAbsorptionPT al
      putStr "<absorptionTP>"
      quickCheck $ propAbsorptionTP al
+
+     putStr "<alignToList>"
+     quickCheck $ propAlignToList al
 
 checkZipUnit 
   :: forall f. (Top f
