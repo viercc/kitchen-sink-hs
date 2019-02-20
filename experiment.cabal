@@ -31,8 +31,10 @@ executable experiment
                      , contravariant
                      , bifunctors
                      , profunctors
+                     , recursion-schemes
                      , pipes
                      , arithmoi
+                     , Decimal
                      , integer-logarithms
                      , data-memocombinators
                      , unix
