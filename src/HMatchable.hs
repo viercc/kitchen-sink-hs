@@ -35,17 +35,20 @@ data UniverseF (f :: (* -> *)) (a :: *)  where
   LitF :: Int -> UniverseF f Int
   NilF :: UniverseF f [a]
   ConsF :: f a -> f [a] -> UniverseF f [a]
+  PairF :: f a -> f b -> UniverseF f (a,b)
 
 instance HFunctor UniverseF where
   hfmap nat tfy = case tfy of
     LitF y -> LitF y
     NilF   -> NilF
     ConsF fa fas -> ConsF (nat fa) (nat fas)
+    PairF fa fb  -> PairF (nat fa) (nat fb)
 
 instance HMatchable UniverseF where
   hzipMatchWith _  (LitF a)       (LitF a')      | a == a' = Just (LitF a)
   hzipMatchWith _  NilF           NilF           = Just NilF
   hzipMatchWith nu (ConsF fa fas) (ConsF ga gas) = ConsF <$> nu fa ga <*> nu fas gas
+  hzipMatchWith nu (PairF fa fb)  (PairF ga gb)  = PairF <$> nu fa ga <*> nu fb gb
   hzipMatchWith _  _              _              = Nothing
 
 instance HFoldable UniverseF where
@@ -53,6 +56,7 @@ instance HFoldable UniverseF where
     LitF _ -> mempty
     NilF   -> mempty
     ConsF fa fas -> f fa <> f fas
+    PairF fa fb  -> f fa <> f fb
 
 newtype HFix (t :: (k -> *) -> (k -> *)) (a :: k) = HFix (t (HFix t) a)
 
@@ -82,6 +86,7 @@ instance (DShow tag, DShow f) => Show (DSum tag f) where
 data UniverseTRep (a :: *) where
   IntT :: UniverseTRep Int
   ListT :: UniverseTRep a -> UniverseTRep [a]
+  PairT :: UniverseTRep a -> UniverseTRep b -> UniverseTRep (a,b)
 
 instance Eq (UniverseTRep a) where
   _ == _  = True
@@ -89,6 +94,7 @@ instance Eq (UniverseTRep a) where
 instance Show (UniverseTRep a) where
   show IntT = "Int"
   show (ListT a) = "[" ++ show a ++ "]"
+  show (PairT a b) = "(" ++ show a ++ "," ++ show b ++ ")"
 
 instance DShow UniverseTRep where
   dshow = show
@@ -99,6 +105,10 @@ instance TestEquality UniverseTRep where
     case testEquality a b of
       Nothing -> Nothing
       Just Refl -> Just Refl
+  testEquality (PairT a b) (PairT c d) =
+    case (testEquality a c, testEquality b d) of
+      (Just Refl, Just Refl) -> Just Refl
+      _                      -> Nothing
   testEquality _ _ = Nothing
 
 data Var a = NameWithType String (UniverseTRep a)
@@ -129,6 +139,8 @@ instance DShow (HFix UniverseF) where
       go _ NilF     = ("NilF"++)
       go q (ConsF fa fas) = showParen (q > 10) $
         ("ConsF "++) . dshowsPrec 11 fa . (' ':) . dshowsPrec 11 fas
+      go q (PairF fa fb) = showParen (q > 10) $
+        ("PairF "++) . dshowsPrec 11 fa . (' ':) . dshowsPrec 11 fb
 
 instance Show (HFix UniverseF a) where
   showsPrec = dshowsPrec
@@ -155,6 +167,9 @@ consVal a as = HFix (ConsF a as)
 listVal :: [Universe a] -> Universe [a]
 listVal = foldr consVal nilVal
 
+pairVal :: Universe a -> Universe b -> Universe (a,b)
+pairVal a b = HFix (PairF a b)
+
 val1 :: Universe Int
 val1 = litVal 1
 
@@ -167,8 +182,10 @@ val3 = listVal (litVal <$> [1,2,3])
 val4 :: Universe [[Int]]
 val4 = listVal [ nilVal, listVal [litVal 1] ]
 
-type UniversePat = HFree UniverseF Var
+val5 :: Universe (Int, [Int])
+val5 = pairVal val1 val3
 
+type UniversePat = HFree UniverseF Var
 
 varPat :: Var a -> UniversePat a
 varPat = HPure
@@ -185,6 +202,8 @@ consPat a as = HFree (ConsF a as)
 listPat :: [UniversePat a] -> UniversePat [a]
 listPat = foldr consPat nilPat
 
+pairPat :: UniversePat a -> UniversePat b -> UniversePat (a,b)
+pairPat a b = HFree (PairF a b)
 
 varX :: Var Int
 varX = NameWithType "x" IntT
@@ -209,3 +228,7 @@ pat3 = consPat (varPat varX) (varPat varXs)
 
 pat4 :: UniversePat [[Int]]
 pat4 = listPat [varPat varXs, varPat varYs]
+
+pat5 :: UniversePat (Int, [Int])
+pat5 = pairPat (varPat varX) (consPat (varPat varY) (varPat varYs))
+

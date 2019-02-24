@@ -45,10 +45,9 @@ eliminateOp = go
     app2 e1 e2 = Mk $ App S2App e1 e2
 
 thereIsNoOp :: Syntax Stage2 -> Bool
-thereIsNoOp = go
-  where
-    go (Mk fe) = case fe of
-      Var _ _ -> True
-      Abs _ _ body -> go body
-      App _ e1 e2 -> go e1 && go e2
-      Op tag _ _ _ -> case (tag :: Stage2 'OpTag) of { }
+thereIsNoOp (Mk fe) =
+  case fe of
+    Var _ _ -> True
+    Abs _ _ body -> thereIsNoOp body
+    App _ e1 e2 -> thereIsNoOp e1 && thereIsNoOp e2
+    Op tag _ _ _ -> case (tag :: Stage2 'OpTag) of { }
