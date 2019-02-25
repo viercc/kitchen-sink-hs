@@ -1,5 +1,9 @@
 {-
 
+https://www.reddit.com/r/math/comments/8seqeh/calculating_probability_for_a_dnd_dice_minigame/
+
+Quoting the post:
+
 Hello all,
 
 I play DnD, which is a tabletop game that revolves around using dice. I came up with an idea for a very quick die-based minigame that could be used for gambling, etc.
