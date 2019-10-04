@@ -46,7 +46,7 @@ means:
 * d(A, A) always hold
 * d(A, T1 T2) hold if either one of the following hold:
   * d(A, T1)
-  * T1 does not contain type variable /\
+  * T1 does not contain type variable &&
     d(A, T2)
 * A dominates nothing other than above
 
@@ -60,24 +60,16 @@ hasNoTyVar = ...
 
 d :: String -> Type -> Bool
 d con (TyCon con') = con == con'
-d _   (TyVar )     = False
+d _   (TyVar _)    = False
 d con (App t1 t2)  = d con t1 || hasNoTyVar t1 && d con t2
 ```
 
-Lemma. d(A,T) → T contains A.
-
-Proof. Do induction on T.
-
-  * T is a type variable:    ¬d(A,T)
-  * T is a type constructor: d(A,T) → T=A
-  * T = T1 T2: d(A,T) → Either d(A,T1) or d(A,T2) holds
-    → By induction hypothesis, T1 or T2 contains A.
+Lemma. d(A,T) ⇒ T contains A.
 
 # Preventing incoherence
 
 The idea is, `instance C T` is not orphan ⇔ `C` is defined in this module or
 for some `A` defined in this module, dom(A,T).
-
 
 ## Examples.
 
@@ -91,16 +83,16 @@ module Foo where
   data E
   data F a
 
-  ­­ Non-orphans in vanilla GHC is still non-orphan 
+  -- Non-orphans in vanilla GHC is still non-orphan 
   instance C E
   instance C (F a)
   
-  instance C (f E)       ­­ orphan
+  instance C (f E)       -- orphan
   instance C (E -> a)
   instance C (Bool -> E)
-  instance C (a -> E)    ­­ orphan
+  instance C (a -> E)    -- orphan
   instance C (F a -> a)
-  instance C (a -> F a)  ­­ orphan
+  instance C (a -> F a)  -- orphan
 ```
 
 ## Properties of this fix
@@ -113,9 +105,9 @@ Predicate dom(-,-) has the following property:
 
 [Theorem] Safety of dom(-,-).
 
-  For all A, B, T, U, suppose both dom(A,T) and dom(B,U) holds. Then,
-  T and U unify (∃V, T ≤ V and U ≤ V) implies (U contains A) or (T contains B).
-  
+> For all A, B, T, U, suppose both dom(A,T) and dom(B,U) holds. Then,
+> T and U unify (∃V, T ≤ V and U ≤ V) implies (U contains A) or (T contains B).
+
 Proof.
   
   If A = B, the theorem trivially holds. Suppose A ≠ B.
@@ -147,7 +139,7 @@ Proof.
 
   4. U1 does not contain type variable and d(A,T1) holds.
 
-     Similarly to above, U1 contains A thus the claim holds.
+     Similarly to 3., U1 contains A thus the claim holds.
 
 Suppose a module `Foo` defines `A` and declares `instance C T` s.t. d(A,T).
 Also, a module `Bar` defines `B` and declares `instance C U` s.t. d(B,U).
@@ -160,8 +152,8 @@ exists in the scope when `instance C T` is in the scope. Trying to resolve a con
 
 ### It is maximal
 
-Another "nice" point about this d(-,-) predicate is, it is *maximal* in the sense it can allow no extra
-pair of (A,T) to maintain the above property.
+Another "nice" point about this d(-,-) predicate is, it is *maximal* in the sense
+you can allow no extra pair (A,T) to maintain the above property.
 
 Assume a pair (A,T), which does not satisfy d(A,T), is considered non-orphan.
 
@@ -172,7 +164,7 @@ Let U be the result of this transformation.
 
 It can be shown that d(B,U) and U does not contain A.
 This allows `instance C U` be declared without warning, in the new module
-defining `B`.
+defining B, which does not depend on the module which owns A.
 
 Since T and U unifies (V = U{A/y} = T{B/x}), it can break coherence silently.
 
@@ -187,7 +179,7 @@ Pure Haskell2010 instances are strictly in form of the following.
 instance C (TC tv1 tv2 ... tvn)
 ```
 
-The current decision for what is considered orphans do not change!
+The current decision for what is considered orphans do not change for them.
 
 ### This method is not unique to the requirement
 
@@ -263,7 +255,7 @@ speculation like this:
 
 * How about this implementation:
 
-  For each covering W1,W2,... of C, using some previously fixed
+  For each minimal covering W1,W2,... of C, using some previously fixed
   ordering on W1, W2, ..., we can think W1, W2, ... be a tuple (of arguments)
   instead of a set.
 
@@ -282,3 +274,18 @@ speculation like this:
     * There is a freedom of choice among:
       * `instance C T1 T2 T3` is not orphan ⇔ dom(A,T1,T3)
       * `instance C T1 T2 T3` is not orphan ⇔ dom(A,T3,T1)
+
+# Issues not yet adressed
+
+* How does this fix compares to other proposed fixes?
+  * `{-# Refine #-}` pragma
+    * I'm not sure this is well studied
+  * @ekmett's blanket warning
+    * How that generalizes to MTPCs?
+* Isn't this overengineering?
+* Is the speculated implementation for FunDeps correct?
+* There have to be some arbitrary choice if this is to be
+  implemented.
+  * Which dom(-,-) is chosen?
+  * How arguments of a MTPC are ordered?
+    * Should there be a canonical order, or make it customizable?
