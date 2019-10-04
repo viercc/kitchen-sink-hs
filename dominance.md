@@ -69,7 +69,7 @@ Lemma. d(A,T) ⇒ T contains A.
 # Preventing incoherence
 
 The idea is, `instance C T` is not orphan ⇔ `C` is defined in this module or
-for some `A` defined in this module, dom(A,T).
+for some `A` defined in this module, d(A,T).
 
 ## Examples.
 
@@ -101,18 +101,18 @@ module Foo where
 
 This definition prevents incoherent instances being used silently.
 
-Predicate dom(-,-) has the following property:
+Predicate d(-,-) has the following property:
 
-[Theorem] Safety of dom(-,-).
+[Theorem] Safety of d(-,-).
 
-> For all A, B, T, U, suppose both dom(A,T) and dom(B,U) holds. Then,
+> For all A, B, T, U, suppose both d(A,T) and d(B,U) holds. Then,
 > T and U unify (∃V, T ≤ V and U ≤ V) implies (U contains A) or (T contains B).
 
 Proof.
   
   If A = B, the theorem trivially holds. Suppose A ≠ B.
 
-  If T=A, then U=A since T and U unifies. But ¬dom(B,U=A) since A ≠ B. So T≠A.
+  If T=A, then U=A since T and U unifies. But ¬d(B,U=A) since A ≠ B. So T≠A.
   Similarly, U≠B.
 
   To d(A,T) and d(B,U) to hold, it must be T = T1 T2 and U = U1 U2.
@@ -193,25 +193,25 @@ said above.
 Observe that, (ignoring ill-kindedness which is not relevant,)
 
 ```
-dom'(A,T) = dom(A, reverse(T)) where
+d'(A,T) = d(A, reverse(T)) where
   reverse(T1 T2) = reverse(T2) reverse(T1)
   reverse(x)     = x
 ```
 
 is also a safe and maximal criteria, but not an extension of standard.
-Modifying dom'(A,T) a bit, we can construct dom''(-,-) which is still
+Modifying d'(A,T) a bit, we can construct d''(-,-) which is still
 safe and maximal, and also is an extension of standard.
 
 ```
 leftmost(T) = T            if T is constructor or variable
             = leftmost(T1) if T = T1 T2
 
-dom''(A,T) =  leftmost(T) == A
-           || leftmost(T) is not variable &&
-              dom'(A,T)
+d''(A,T) =  leftmost(T) == A
+         || leftmost(T) is not variable &&
+            d'(A,T)
 ```
 
-There can be many, many variant of dom(-,-).
+There can be many, many variant of d(-,-).
 
 # Extending dominance to MPTCs
 
@@ -223,22 +223,22 @@ For example, consider a type class with three arguments.
 class C a b c
 ```
 
-We can define dom(A,T1,T2,T3) like this.
+We can define d(A,T1,T2,T3) like this.
 
 ```
-dom(A,T1,T2,T3) =
-     dom(A,T1)
-  || T1 does not contain type variable && dom(A,T2)
-  || T1 and T2 does not contain type variable && dom(A,T3)
+d(A,T1,T2,T3) =
+     d(A,T1)
+  || T1 does not contain type variable && d(A,T2)
+  || T1 and T2 does not contain type variable && d(A,T3)
 ```
 
 Then, whether `instance C U1 U2 U3` is orphan or not is
-judged by dom(A,U1,U2,U3) for each A defined by the module
+judged by d(A,U1,U2,U3) for each A defined by the module
 that instance lives.
 
 But, there is a freedom of choice: you can reorder the argument
-of `C` when passing them to `dom`, as long as it is consistent.
-judging by dom(A,U3,U1,U2) is also OK.
+of `C` when passing them to `d`, as long as it is consistent.
+Judging by d(A,U3,U1,U2) is also OK.
 
 I'm not sure how it should be for FunDeps. I can give a
 speculation like this:
@@ -261,19 +261,19 @@ speculation like this:
 
   ```
   C(T1,T2,...) is not orphan ⇔
-    ∀W=(i,j,...) ∈ {W | W is a covering of C}, dom(A, Ti, Tj, ...)
+    ∀W=(i,j,...) ∈ {W | W is a covering of C}, d(A, Ti, Tj, ...)
   ```
 
   For example,
 
   * `class C a b | a -> b`
-    * `instance C T1 T2` is not orphan ⇔ dom(A,T1)
+    * `instance C T1 T2` is not orphan ⇔ d(A,T1)
   * `class C a b | a -> b, b -> a`
-    * `instance C T1 T2` is not orphan ⇔ dom(A,T1) && dom(A,T2)
+    * `instance C T1 T2` is not orphan ⇔ d(A,T1) && d(A,T2)
   * `class C a b c | a -> b`
     * There is a freedom of choice among:
-      * `instance C T1 T2 T3` is not orphan ⇔ dom(A,T1,T3)
-      * `instance C T1 T2 T3` is not orphan ⇔ dom(A,T3,T1)
+      * `instance C T1 T2 T3` is not orphan ⇔ d(A,T1,T3)
+      * `instance C T1 T2 T3` is not orphan ⇔ d(A,T3,T1)
 
 # Issues not yet adressed
 
@@ -281,11 +281,11 @@ speculation like this:
   * `{-# Refine #-}` pragma
     * I'm not sure this is well studied
   * @ekmett's blanket warning
-    * How that generalizes to MTPCs?
+    * How that generalizes to MPTCs?
 * Isn't this overengineering?
 * Is the speculated implementation for FunDeps correct?
 * There have to be some arbitrary choice if this is to be
   implemented.
-  * Which dom(-,-) is chosen?
-  * How arguments of a MTPC are ordered?
+  * Which d(-,-) is chosen?
+  * How arguments of a MPTC are ordered?
     * Should there be a canonical order, or make it customizable?
