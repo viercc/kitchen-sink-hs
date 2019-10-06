@@ -215,6 +215,8 @@ There can be many, many variant of d(-,-).
 
 # Extending dominance to MPTCs
 
+## Definition
+
 This method can be extended to cover MPTCs.
 
 For example, consider a type class with three arguments.
@@ -239,6 +241,44 @@ that instance lives.
 But, there is a freedom of choice: you can reorder the argument
 of `C` when passing them to `d`, as long as it is consistent.
 Judging by d(A,U3,U1,U2) is also OK.
+
+## It fails to comply with current behavior
+
+Unlike non-MPTCs, this method **does not comply** with
+current `-XMultiParamTypeClasses -XNoFlexibleInstances`.
+
+``` haskell
+module Foo where
+  class C a b
+
+module Bar where
+  import Foo
+  
+  data F a
+  
+  -- Currently, these instances are allowed.
+  -- But the proposed change does not allow both.
+  -- Depending an order of parameters, only one of them
+  -- are allowed.
+  instance C (F a) [b]
+  instance C [a]   (F b)
+  
+  -- Why? Suppose the order is left-to-right.
+  --   C T U is not orphan ⇔ d(F,T,U)
+  -- Then, this method judges
+  -- 
+  -- instance C (F a) [b]   -- (1):OK
+  -- instance C [a]   (F b) -- (2):Orphan
+  -- 
+  -- This is, because in another module Bar, there can be
+  --
+  -- data Bar = Bar
+  -- instance C [Bar] b     -- (3):OK
+  --
+  -- Which may overlap to the instance (2).
+```
+
+## On FunDeps
 
 I'm not sure how it should be for FunDeps. I can give a
 speculation like this:
@@ -375,13 +415,16 @@ module Foo where
 module Bar where
   import Foo
   
+  import Middleware.Specific.Types (M)
+  
   data F x
   
   instance C (F x) [y]   -- All of (A) (B) (C) accept
   instance C [x] (F y)   -- (A) (B) only
   instance C (F x) y     -- (C) only, but (B) can be customized to allow it
   instance C x (F y)     -- Nothing accept, but (B) can be customized to allow it
-  instance C [F x] [F x] -- (C) only
+  instance C [F x] [F x] -- (C) only, but (B) can be customized to allow it
+  instance C (M (F x)) (M (F x)) -- (C) only
 ```
 
 **Disclaimer:** How much it is permissive relies greatly on
