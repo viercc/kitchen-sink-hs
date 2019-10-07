@@ -424,7 +424,7 @@ module Bar where
   instance C (F x) y     -- (C) only, but (B) can be customized to allow it
   instance C x (F y)     -- Nothing accept, but (B) can be customized to allow it
   instance C [F x] [F x] -- (C) only, but (B) can be customized to allow it
-  instance C (M (F x)) (M (F x)) -- (C) only
+  instance C (M (F x)) (M (F x)) -- (C) only, but (B) can be customized to allow it
 ```
 
 **Disclaimer:** How much it is permissive relies greatly on
