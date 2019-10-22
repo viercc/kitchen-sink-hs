@@ -1,0 +1,21 @@
+name:                lattices
+version:             0.1.0.0
+synopsis:            Various order structures
+build-type:          Simple
+cabal-version:       >=2.0
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Searchable,
+                       Cantor,
+                       Lattice,
+                       Lattice.BitSet,
+                       Lattice.Classes,
+                       Lattice.Dual,
+                       Lattice.Ordered,
+                       FinCoFin,
+                       POrd
+  build-depends:       base >= 4.7 && < 5,
+                       containers, deepseq, intervals
+  default-language:    Haskell2010
+  ghc-options:         -Wall -Wno-dodgy-exports

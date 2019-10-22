@@ -1,0 +1,39 @@
+cabal-version:       >=1.10
+name:                monads-collection
+version:             0.1.0.0
+synopsis:            Collection of Monads
+license-file:        LICENSE
+author:              Koji Miyazato
+maintainer:          viercc@gmail.com
+build-type:          Simple
+extra-source-files:  CHANGELOG.md README.md
+
+library
+  hs-source-dirs:    src
+  exposed-modules:   Control.Monad.Queue,
+                     Monad.Free,
+                     Monad.FTransducer,
+                     Monad.FreeAny,
+                     Monad.IOCache,
+                     Monad.Indexed,
+                     Monad.Logger,
+                     Monad.ProgramTransducer,
+                     Monad.Ranked,
+                     Monad.Searchable,
+                     Monad.SetMonad,
+                     Monad.ShrinkOnce
+  build-depends:     base >=4.11 && <5
+                   , containers
+                   , mtl
+                   , stm
+  default-language:  Haskell2010
+  ghc-options:       -Wall -Wcompat
+
+test-suite monad-queue-test
+  type:    exitcode-stdio-1.0
+  main-is: QueueTest.hs
+  hs-source-dirs: test
+  build-depends: base >=4.11 && <5
+               , monads-collection
+  default-language: Haskell2010
+  ghc-options:      -rtsopts -with-rtsopts=-M2m

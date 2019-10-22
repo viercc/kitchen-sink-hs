@@ -130,10 +130,13 @@ data WrapAtkey m x i = forall j. WrapAtkey (m i j (x j))
 instance AtkeyIxFunctor f => IxFunctor (WrapAtkey f) where
   ifmap phi (WrapAtkey mij) = WrapAtkey $ ifmap_A phi mij
 
+{-
+-- Ehh I couldn't made it
 instance AtkeyIxMonad m => IxMonad (WrapAtkey m) where
   ireturn xi = WrapAtkey $ ireturn_A xi
   ijoin (WrapAtkey mm) =
     WrapAtkey $ ibind_A mm (\(WrapAtkey mjk) -> mjk)
+-}
 
 -- | "Free monad" over IxFunctor
 data IxFree (f :: (k -> *) -> k -> *)

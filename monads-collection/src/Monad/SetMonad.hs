@@ -48,7 +48,7 @@ does when there is no @Eq X@ or @Ord X@ instance?
 > countRange f = Data.Foldable.length (f <$> nums)
 
 -}
-module SetMonad(
+module Monad.SetMonad(
   -- * Set with monadic operations
   PrimSet,
   Set(),

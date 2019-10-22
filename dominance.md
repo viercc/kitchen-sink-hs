@@ -280,8 +280,9 @@ module Bar where
 
 ## On FunDeps
 
-I'm not sure how it should be for FunDeps. I can give a
-speculation like this:
+I'm not sure how it should be for FunDeps.
+
+### Speculation #1
 
 * A class with FunDep like `C a b c | a -> b` can have one or more set of
   its arguments which completely determines all of other arguments.

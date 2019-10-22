@@ -2,7 +2,7 @@
 module Monad.FTransducer where
 
 import           Control.Monad
-import           Free
+import           Monad.Free
 
 type Transducer f g = forall r. (g r -> r) -> f r -> r
 

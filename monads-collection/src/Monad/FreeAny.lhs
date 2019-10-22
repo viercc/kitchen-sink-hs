@@ -31,9 +31,10 @@ Free is a Functor, Applicative and Monad.
 
 "Free Monoid" is indeed free monoid.
 
+> instance Semigroup (Free Monoid a) where
+>   a <> b = Free $ \f -> runFree a f <> runFree b f
 > instance Monoid (Free Monoid a) where
 >   mempty      = Free $ \_ -> mempty
->   mappend a b = Free $ \f -> runFree a f `mappend` runFree b f
 
 We can use any type class 'c :: * -> Constraint', so one can try Num.
 
