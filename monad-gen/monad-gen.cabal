@@ -1,14 +1,12 @@
 name:                monad-gen
 version:             0
-homepage:            https://github.com/githubuser/experiment#readme
-copyright:           2018 Author name here
 build-type:          Simple
 cabal-version:       >=2.0
 
 executable monad-gen
   hs-source-dirs:      src
   main-is:             MonadGen.hs
-  other-modules:       Vec, Enum1, Cardinality
+  other-modules:       Vec, Enum1
   default-language:    Haskell2010
   build-depends:       base >= 4.10 && < 5
                      , vector

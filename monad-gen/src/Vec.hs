@@ -1,6 +1,21 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase    #-}
-module Vec(Vec(), empty, singleton, vec, generate, (!), toVector, fromVector) where
+module Vec(
+  Vec(),
+  empty, singleton, generate,
+  toList, fromList, vec,
+  toVector, fromVector,
+  
+  imap, indexed, iota,
+  
+  zipWith, zipWith3, zip, zip3,
+  alignWith,
+  
+  (!),
+
+) where
+
+import Prelude hiding (zipWith, zipWith3, zip, zip3)
 
 import qualified Control.Applicative
 import Control.Monad
@@ -16,30 +31,60 @@ import qualified Data.Vector as V
 data Vec a = Vec !Int (Int -> a)
     deriving Functor
 
+-- * Core construction
+empty :: Vec a
+empty = Vec 0 (\_ -> error "Vec.empty")
+
+singleton :: a -> Vec a
+singleton a = Vec 1 (const a)
+
+generate :: Int -> (Int -> a) -> Vec a
+generate n = Vec (max n 0)
+
+-- * Accessing
+(!) :: Vec a -> Int -> a
+Vec n f ! i | 0 <= i && i < n = f i
+            | otherwise       = error $ "out of bounds:" ++ show i ++ " for Vec with length " ++ show n
+
+-- * Conversion
 toVector :: Vec a -> V.Vector a
 toVector (Vec n f) = V.generate n f
 
 fromVector :: V.Vector a -> Vec a
 fromVector v = Vec (V.length v) (V.unsafeIndex v)
 
-empty :: Vec a
-empty = Vec 0 (\_ -> error "Vec.empty")
-
-singleton :: a -> Vec a
-singleton a = Vec 1 $ \i ->
-  case i of
-    0 -> a
-    _ -> error $ "out of bounds:" ++ show i ++ " for Vec.singleton"
-
-vec :: [a] -> Vec a
+fromList, vec :: [a] -> Vec a
 vec = fromVector . V.fromList
+fromList = vec
 
-generate :: Int -> (Int -> a) -> Vec a
-generate = Vec
+-- * Index
+imap :: (Int -> a -> b) -> Vec a -> Vec b
+imap u (Vec n f) = Vec n (\i -> u i (f i))
 
-(!) :: Vec a -> Int -> a
-Vec n f ! i | 0 <= i && i < n = f i
-            | otherwise       = error $ "out of bounds:" ++ show i ++ " for Vec with length " ++ show n
+indexed :: Vec a -> Vec (Int, a)
+indexed = imap (,)
+
+iota :: Int -> Vec Int
+iota n = Vec n id
+
+-- * Zip/Align
+zip :: Vec a -> Vec b -> Vec (a, b)
+zip = zipWith (,)
+
+zip3 :: Vec a -> Vec b -> Vec c -> Vec (a, b, c)
+zip3 = zipWith3 (,,)
+
+zipWith :: (a -> b -> c) -> Vec a -> Vec b -> Vec c
+zipWith u (Vec n f) (Vec m g) = Vec (min n m) (\i -> u (f i) (g i))
+
+zipWith3 :: (a -> b -> c -> d) -> Vec a -> Vec b -> Vec c -> Vec d
+zipWith3 u as bs cs = zipWith ($) (zipWith u as bs) cs
+
+alignWith :: (a -> r) -> (b -> r) -> (a -> b -> r) -> Vec a -> Vec b -> Vec r
+alignWith this that these (Vec n f) (Vec m g) = Vec (max n m) h
+  where h | n < m     = \i -> if i < n then these (f i) (g i) else that (g i)
+          | n == m    = \i -> these (f i) (g i)
+          | otherwise = \i -> if i < m then these (f i) (g i) else this (f i)
 
 instance (Show a) => Show (Vec a) where
   show v = "vec " ++ show (toList v)
@@ -50,7 +95,8 @@ instance Foldable Vec where
   foldMap g (Vec n f) = foldMap (g . f) [0..n-1]
 
 instance Traversable Vec where
-  traverse f v = fromVector <$> traverse f (toVector v)
+  traverse f (Vec n g) = fromVector <$> traverse (f . g) (V.generate n id)
+  mapM f (Vec n g) = fromVector <$> mapM (f . g) (V.generate n id)
 
 instance Applicative Vec where
   pure = singleton
@@ -107,10 +153,10 @@ instance Monoid (Vec a) where
   mconcat = treeMerge
 
 treeMerge :: [Vec a] -> Vec a
-treeMerge = foldl' (<>) empty . doublingSeq . filter (not . null)
+treeMerge = foldl'(flip (<>))  empty . doublingSeq . filter (not . null)
   where
-    doublingSeq = foldr step []
-    step xs [] = [xs]
-    step xs (ys:rest)
+    doublingSeq = foldl' step []
+    step [] xs = [xs]
+    step (ys:rest) xs
         | 2 * length xs <= length ys = xs : ys : rest
-        | otherwise                  = step (xs <> ys) rest
+        | otherwise                  = step rest (ys <> xs)

@@ -59,8 +59,8 @@ counterExamplesAssoc join' =
 cache :: Vec a -> Vec a
 cache = fromVector . toVector
 
-data F a = F0 | F1 a a
--- data F a = F0 a | F1 a a
+-- data F a = F0 | F1 a a
+data F a = F0 a | F1 a a
 -- data F a = F0 | F1 a | F2 a a
 -- data F a = F0 a | F1 a | F2 a a
   deriving stock (Show, Eq, Functor, Foldable, Traversable, Generic1)

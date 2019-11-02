@@ -74,7 +74,7 @@ steppedCoEnum1 = generate size outer
       | i == 0    = []
       | otherwise = let (j', k) = j `divMod` n
                     in k : indices (i-1) j'
-    outer j = fmap toNat $ traverse inner $ vec $ zip [0..] (indices slots j)
+    outer j = fmap toNat $ traverse inner $ vec $ Prelude.zip [0..] (indices slots j)
     inner (fIdx, gIdx) =
       let numArgs = length (fs ! fIdx)
           vars = generate numArgs id
