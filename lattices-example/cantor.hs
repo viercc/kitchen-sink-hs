@@ -2,14 +2,14 @@
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE RankNTypes        #-}
-module Cantor where
+module Main(main) where
 
 import           Control.Applicative
 import           Control.Arrow       ((***))
 import           Data.Foldable       (toList)
 import           Numeric.Interval
 
-import           Searchable
+import           Monad.Searchable
 
 data Stream a = Stream a (Stream a)
               deriving (Show, Functor, Foldable, Traversable)
@@ -104,3 +104,12 @@ example3 = (cantorToDouble *** cantorToDouble) <$> search (cantor `prod` cantor)
   where eps = (1/2) ^ (10 :: Int) :: RealNum
         condition (x,y) = let z = cantorToReal x + cantorToReal y
                           in (1/2 - eps < z) && (z <= 1/2)
+
+main :: IO ()
+main =
+  do putStrLn "example1: 1/2 < x^2 < 3/4"
+     print example1
+     putStrLn "example2: 3 < (1+x)^3 < 4"
+     print example2
+     putStrLn "example3: 1/2 - eps < x + y <= 1/2"
+     print example3
