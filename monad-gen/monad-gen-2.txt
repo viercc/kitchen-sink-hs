@@ -1,8 +1,0 @@
-Build profile: -w ghc-8.8.1 -O2
-In order, the following will be built (use -v for more details):
- - monad-gen-0 (exe:monad-gen) (file src/MonadGen.hs changed)
-Preprocessing executable 'monad-gen' for monad-gen-0..
-Building executable 'monad-gen' for monad-gen-0..
-[2 of 3] Compiling Enum1            ( src/Enum1.hs, /home/koji/Haskell/experiment/monad-gen/dist-newstyle/build/x86_64-linux/ghc-8.8.1/monad-gen-0/x/monad-gen/opt/build/monad-gen/monad-gen-tmp/Enum1.o )
-[3 of 3] Compiling Main             ( src/MonadGen.hs, /home/koji/Haskell/experiment/monad-gen/dist-newstyle/build/x86_64-linux/ghc-8.8.1/monad-gen-0/x/monad-gen/opt/build/monad-gen/monad-gen-tmp/Main.o )
-Linking /home/koji/Haskell/experiment/monad-gen/dist-newstyle/build/x86_64-linux/ghc-8.8.1/monad-gen-0/x/monad-gen/opt/build/monad-gen/monad-gen ...
