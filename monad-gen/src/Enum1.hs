@@ -2,23 +2,18 @@
 {-# LANGUAGE DerivingVia, StandaloneDeriving  #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE KindSignatures #-}
 module Enum1(
   Enum1(..),
+  
   CoEnum1(..),
-  allNaturals,
-  allPures,
-  allJoins,
-  allLiftA2,
-
-  steppedCoEnum1,
+  toVec, holeCount,
   
   Generically(..),
   GEnum1'(),
   GCoEnum1'()
 ) where
-
-import Data.Foldable
-import Control.Applicative (liftA2)
 
 import GHC.Generics
 
@@ -27,12 +22,7 @@ import Data.Coerce
 import Data.Functor.Identity
 
 import Vec
-
--- Small utility!
-coerceMap :: Coercible (f a) (f b) => (a -> b) -> f a -> f b
-coerceMap _ = coerce
-
--------------------
+import Util
 
 class Enum1 f where
   size1 :: Int -> Int
@@ -57,38 +47,17 @@ instance (Enum1 f, Enum1 g) => Enum1 (f :.: g) where
       gsize = size1 @g n
       inv (Comp1 fga) = fromEnum1 gsize (fromEnum1 n ia) fga
 
----------------------------------------
-
-steppedCoEnum1
-  :: forall f g a.
-     (Enum1 f, Foldable f, Enum1 g, Traversable g)
-  => Vec (Vec (f a -> g a))
-steppedCoEnum1 = generate size outer
-  where
-    fs = enum1 @f (singleton ())
-    gs = enum1 @g (singleton ())
-    n = length gs
-    slots = size1 @f 1
-    size = n ^ slots
-    indices i j
-      | i == 0    = []
-      | otherwise = let (j', k) = j `divMod` n
-                    in k : indices (i-1) j'
-    outer j = fmap toNat $ traverse inner $ vec $ Prelude.zip [0..] (indices slots j)
-    inner (fIdx, gIdx) =
-      let numArgs = length (fs ! fIdx)
-          vars = generate numArgs id
-      in traverse (const vars) (gs ! gIdx)
-    toNat gxTable fa =
-      let as = vec (toList fa)
-          gx = gxTable ! fromEnum1 @f 1 (const 0) fa
-      in (as !) <$> gx
-
 ------------------------------------------
 
 class CoEnum1 f where
   cosize1 :: (Int -> Int) -> Int
   coenum1 :: (Vec a -> Vec r) -> Vec (f a -> r)
+
+toVec :: CoEnum1 f => f a -> Vec a
+toVec = coenum1 singleton ! 0
+
+holeCount :: CoEnum1 f => f a -> Int
+holeCount = coenum1 (singleton . length) ! 0
 
 instance (Generic1 f, GCoEnum1' (Rep1 f)) => CoEnum1 (Generically f) where
   cosize1 = cosize1' @(Rep1 f)
@@ -213,17 +182,3 @@ coenumVec1 gen gs = go 0 empty
     n = length gs
     go i acc | i >= n    = gen acc
              | otherwise = fmap ($ gs ! i) $ coenum1' (\as -> go (i + 1) (acc <> as))
-
----------------------------
-
-allNaturals :: forall f g a. (CoEnum1 f, Enum1 g) => Vec (f a -> g a)
-allNaturals = coenum1 enum1
-
-allPures :: forall f a. (Enum1 f) => Vec (a -> f a)
-allPures = coerceMap (. Identity) $ allNaturals @Identity @f
-
-allJoins :: forall f a. (Functor f, CoEnum1 f, Enum1 f) => Vec (f (f a) -> f a)
-allJoins = coerceMap (. Comp1) $ allNaturals @(f :.: f) @f
-
-allLiftA2 :: forall f a b c. (Functor f, CoEnum1 f, Enum1 f) => (a -> b -> c) -> Vec (f a -> f b -> f c)
-allLiftA2 f = coenum1 $ \as -> coenum1 $ \bs -> enum1 (liftA2 f as bs)

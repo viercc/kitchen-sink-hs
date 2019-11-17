@@ -13,9 +13,13 @@ module Vec(
   
   (!),
 
+  filter, mapMaybe,
+
 ) where
 
-import Prelude hiding (zipWith, zipWith3, zip, zip3)
+import Prelude hiding (zipWith, zipWith3, zip, zip3, filter)
+import qualified Prelude
+import qualified Data.Maybe (mapMaybe)
 
 import qualified Control.Applicative
 import Control.Monad
@@ -86,6 +90,13 @@ alignWith this that these (Vec n f) (Vec m g) = Vec (max n m) h
           | n == m    = \i -> these (f i) (g i)
           | otherwise = \i -> if i < m then these (f i) (g i) else this (f i)
 
+-- * Non-lazy operations: resulted Vec will be backed by concrete Vectors
+filter :: (a -> Bool) -> Vec a -> Vec a
+filter p = vec . Prelude.filter p . toList
+
+mapMaybe :: (a -> Maybe b) -> Vec a -> Vec b
+mapMaybe f = vec . Data.Maybe.mapMaybe f . toList
+
 instance (Show a) => Show (Vec a) where
   show v = "vec " ++ show (toList v)
 
@@ -153,7 +164,7 @@ instance Monoid (Vec a) where
   mconcat = treeMerge
 
 treeMerge :: [Vec a] -> Vec a
-treeMerge = foldl'(flip (<>))  empty . doublingSeq . filter (not . null)
+treeMerge = foldl' (flip (<>))  empty . doublingSeq . Prelude.filter (not . null)
   where
     doublingSeq = foldl' step []
     step [] xs = [xs]
