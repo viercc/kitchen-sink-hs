@@ -1,15 +1,14 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module Monad.IOCache (
   Cache(),
+  newCache,
+  newEmptyCache,
   request,
   requestCached,
   forkCache,
 
   CachedTaskFail(..)
 ) where
-
-import Control.Monad.IO.Class
-import Control.Monad.Reader
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -19,7 +18,6 @@ import Control.Exception
 
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.MVar
 
 data Cache k v = CacheEnv {
     localCache :: TVar (Map k v)

@@ -21,7 +21,8 @@ library
                      Monad.Ranked,
                      Monad.Searchable,
                      Monad.SetMonad,
-                     Monad.ShrinkOnce
+                     Monad.ShrinkOnce,
+                     Monad.Esoteric
   build-depends:     base >=4.11 && <5
                    , containers
                    , mtl
