@@ -1,3 +1,0 @@
-#pure = #(forall a. a -> F a) = 2
-#join = #(forall a. F (F a) -> F a) = 425
-#(F (F ()) -> F ()) = 32

@@ -1,3 +1,0 @@
-#pure = #(forall a. a -> F a) = 3
-#join = #(forall a. F (F a) -> F a) = 25798901760000
-#(F (F ()) -> F ()) = 14348907
