@@ -30,6 +30,11 @@ instance Monad Span where
       (Span b _, Point b')  -> Span b b'
       (Span b _, Span _ b') -> Span b b'
 
+enumSpan :: (Alternative f) => f a -> f (Span a)
+enumSpan as =
+      Point <$> as
+  <|> Span <$> as <*> as
+
 data Gold a = Zero | One a | Two a a
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
   deriving (Applicative) via (WrappedMonad Gold)
@@ -47,6 +52,14 @@ instance Monad Gold where
         Two b' _ -> Two b b'
       mb -> mb
 
+enumGold :: (Alternative f) => f a -> f (Gold a)
+enumGold as =
+      pure Zero
+  <|> One <$> as
+  <|> Two <$> as <*> as
+
+-- Twist is also found by searching.
+-- What it means is not clear, but at least it passes Monad laws check.
 data Twist a = T Bool a a
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
   deriving (Applicative) via (WrappedMonad Twist)
@@ -66,6 +79,9 @@ instance Monad Twist where
           (True,  False, True)  -> T True  x01 x11
           (True,  True,  False) -> T True  x00 x10
           (True,  True,  True)  -> T True  x00 x11
+
+enumTwist :: (Alternative f) => f a -> f (Twist a)
+enumTwist as = T <$> (pure True <|> pure False) <*> as <*> as
 
 --------------------------------
 
@@ -90,6 +106,13 @@ instance Monad Nezzle where
   a :| []      >>= k = k a
   a :| (a':as) >>= k =
     headNezzle (k a) :| toList ((a' :| as) >>= tailNezzle . k)
+
+-- Not exhaustive; only up to length 3
+enumNezzle :: (Alternative f) => f a -> f (Nezzle a)
+enumNezzle as = (:|) <$> as <*> s (s nil)
+  where
+    nil = pure []
+    s n = pure [] <|> (:) <$> as <*> n
 
 --------------------------------
 
@@ -131,13 +154,22 @@ instance Monad Odd where
       estep Nil         = Nil
       estep (Even x xs) = k x `plusOO` ostep xs
 
+-- [x] or [x,y,z]
+enumOdd :: Alternative f => f a -> f (Odd a)
+enumOdd as = as1 <|> as3
+  where
+    as0 = pure Nil
+    as1 = Odd <$> as <*> as0
+    as2 = Even <$> as <*> as1
+    as3 = Odd <$> as <*> as2
+
 -- (3n+1)-lengthed list, (4n+1)-lengthed list, ...
 -- are also Monads.
 
 newtype List3Np1 a = List3Np1 [a]
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
   -- Monad instance inherited from [] keeps invariant.
-  deriving newtype (Applicative, Monad)
+  deriving (Applicative, Monad) via []
 
 makeList3Np1 :: [a] -> Maybe (List3Np1 a)
 makeList3Np1 as

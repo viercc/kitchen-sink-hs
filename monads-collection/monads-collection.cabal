@@ -22,13 +22,23 @@ library
                      Monad.Searchable,
                      Monad.SetMonad,
                      Monad.ShrinkOnce,
-                     Monad.Esoteric
+                     Monad.Esoteric,
+                     MonadLaws
   build-depends:     base >=4.11 && <5
                    , containers
                    , mtl
                    , stm
   default-language:  Haskell2010
   ghc-options:       -Wall -Wcompat
+
+test-suite esoteric-test
+  type:    exitcode-stdio-1.0
+  main-is: EsotericTest.hs
+  hs-source-dirs: test
+  build-depends: base >=4.11 && <5
+               , monads-collection
+  default-language: Haskell2010
+  ghc-options:      -rtsopts -with-rtsopts=-M2m
 
 test-suite monad-queue-test
   type:    exitcode-stdio-1.0
