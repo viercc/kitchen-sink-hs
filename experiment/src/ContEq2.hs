@@ -5,7 +5,7 @@ The idea directly taken from
 https://www.reddit.com/r/haskell/comments/ahu6jp/fun_fact_the_continuation_monad_cont_r_a_has_an/
 
 -}
-module Main where
+module ContEq2 where
 
 import Data.Foldable
 import qualified Data.Map as Map

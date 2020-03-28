@@ -9,41 +9,28 @@ copyright:           2018-2020 Koji Miyazato
 build-type:          Simple
 extra-source-files:  README.md
 
-common basics
+library
+  hs-source-dirs:  src
+  exposed-modules: AdHocInstances, AdditionChain, Cardinality,
+                   Cats, CheapRecord, ContEq2, Distributive, Dsl,
+                   GenericN, HMatchable, Heap, LCS, LatticeLike, ListT,
+                   LogRwd, Matrix, MatrixCatamorphism,
+                   Ordinal, Polynomial, Readerize,
+                   Selective, Selective2, TreesThatGrow
   build-depends:       base >= 4.10 && < 5
-                       -- Basic techs
                      , mtl
-                     , deepseq
-                     , QuickCheck
-                     
+                     , data-ordlist
                      , ghc-prim
                      , containers
-                     , unordered-containers
-                     , vector
-  ghc-options:         -Wall -Wcompat
-
-common algo
-  build-depends: data-ordlist
-               , array
-               , witherable
-               , these
-               , semialign
-               , data-memocombinators
-
-common math
-  build-depends: random
-               , arithmoi
-               , integer-logarithms
-               , Decimal
-
-common theories
-  build-depends: reflection
-               , constraints
-               , contravariant
-               , bifunctors
-               , profunctors
-               , recursion-schemes
+                     , reflection
+                     , these
+                     , semialign
+                     , QuickCheck
+                     , autolift
+  ghc-options:         -Wall -Wcompat -Wunused-packages
 
 executable experiment-configured
-  import: basics, algo, math, theories
+  build-depends:       base, experiment
+  default-language:    Haskell2010
   main-is: ok.hs
+

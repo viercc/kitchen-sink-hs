@@ -5,12 +5,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DerivingVia #-}
 module LatticeLike(
-  Zippable(..),
-  Align(..),
-  LatticeLike,
-  Top(..),
-  Bottom(..),
-
   Threeway(..),
   Pentagon(..),
   R(..),
@@ -19,21 +13,17 @@ module LatticeLike(
   main
 ) where
 
-import           Prelude               hiding (repeat, zip)
-import qualified Prelude
+import           Prelude               hiding (repeat, zip, zipWith)
 
-import           Control.Applicative
-
-import qualified Data.Align            as Al
+import           Data.Zip
+import           Data.Align
 import           Data.Functor.Classes
 import           Data.These
 import           Data.Maybe (mapMaybe)
 import qualified Data.Foldable         as F
 
 import           Data.Map (Map)
-import qualified Data.Map as Map
 import           Data.Functor.Compose
-import           Data.Functor.Identity
 import           Data.Functor.Product
 
 import           Data.Tuple            (swap)
@@ -42,36 +32,6 @@ import           Data.Proxy
 import AutoLift
 
 import Test.QuickCheck
-
-class (Functor f) => Zippable f where
-  zip :: f a -> f b -> f (a,b)
-  {-
-     [zipIdempotence] @zip x x = fmap (\a -> (a,a)) x@
-     [zipAssociative] @zip x (zip y z) = fmap assoc' $ zip (zip x y) z@
-     [zipCommutative] @zip x y = fmap swap $ zip y x@
-  -}
-
-class (Functor f) => Align f where
-  align :: f a -> f b -> f (These a b)
-  {-
-     [alignIdempotence] @align x x = fmap (\a -> These a a) x@
-     [alignAssociative] @align x (align y z) = fmap assocT' $ align (align x y) z@
-     [alignCommutative] @align x y = fmap swapT $ align y x@
-   -}
-
-class (Zippable f, Align f) => LatticeLike f
-  {-
-     [Absorption1] @fmap fst  $ zip x (align x y) = x@
-     [Absorption2] @fmap fstT $ align x (zip x y) = fmap Just x@
-  -}
-
-class (Zippable f) => Top f where
-  repeat :: a -> f a
-  -- [zipUnit] @zip (repeat a) x = fmap (a,) x@
-
-class (Align f) => Bottom f where
-  nil :: f a
-  -- [alignUnit] @align nil x = fmap That x@
 
 assoc :: (a,(b,c)) -> ((a,b),c)
 assoc (a,(b,c)) = ((a,b),c)
@@ -102,100 +62,11 @@ sndT :: These a b -> Maybe b
 sndT = fstT . swapT
 
 ---- Instances ----
-
-instance Zippable Maybe where zip = liftA2 (,)
-instance Align Maybe    where align = Al.align
-instance LatticeLike Maybe
-instance Top Maybe      where  repeat = Just
-instance Bottom Maybe   where  nil = Nothing
-
-instance Zippable [] where zip = Prelude.zip
-instance Align []    where align = Al.align
-  -- ^ If you change @Al.align@ to @badAlign@, it does not pass
-  --   laws test
-instance LatticeLike []
-instance Top []      where repeat = Prelude.repeat
-instance Bottom []   where nil = []
-
-badAlign :: [a] -> [b] -> [These a b]
-badAlign [] bs = That <$> bs
-badAlign as [] = This <$> as
-badAlign as bs = zipWith These as bs
-
-instance Zippable Identity where zip = liftA2 (,)
-instance Align Identity    where align = liftA2 These
-instance LatticeLike Identity
-instance Top Identity      where repeat = Identity
-
-instance Zippable ((->) e) where zip = liftA2 (,)
-instance Align ((->) e)    where align = liftA2 These
-instance LatticeLike ((->) e)
-instance Top ((->) e)      where repeat = const
-
-
-instance (Ord k) => Zippable (Map k) where zip = Map.intersectionWith (,)
-instance (Ord k) => Align (Map k)    where align = Al.align
-instance (Ord k) => LatticeLike (Map k)
-instance (Ord k) => Bottom (Map k)   where nil = Map.empty
-
-instance (Zippable f, Zippable g) => Zippable (Product f g) where
-  zip (Pair fa ga) (Pair fb gb) = Pair (zip fa fb) (zip ga gb)
-
-instance (Align f, Align g) => Align (Product f g) where
-  align (Pair fa ga) (Pair fb gb) = Pair (align fa fb) (align ga gb)
-
-instance (LatticeLike f, LatticeLike g) => LatticeLike (Product f g)
-
-instance (Top f, Top g) => Top (Product f g) where
-  repeat a = Pair (repeat a) (repeat a)
-
-instance (Bottom f, Bottom g) => Bottom (Product f g) where
-  nil = Pair nil nil
-
-
-instance (Zippable f, Zippable g) => Zippable (Compose f g) where
-  zip (Compose fga) (Compose fgb) =
-    Compose $ uncurry zip <$> zip fga fgb
-
-instance (Align f, Align g) => Align (Compose f g) where
-  align (Compose fga) (Compose fgb) =
-    Compose $ alignT <$> align fga fgb
-      where
-        alignT (This ga)     = This <$> ga
-        alignT (That gb)     = That <$> gb
-        alignT (These ga gb) = align ga gb
-
-instance (LatticeLike f, LatticeLike g) => LatticeLike (Compose f g)
-
-instance (Top f, Top g) => Top (Compose f g) where
-  repeat a = Compose (repeat (repeat a))
-
-instance (Bottom f, Align g) => Bottom (Compose f g) where
-  nil = Compose nil
-
-{- |
-
->   Two
->    |
->   One
->    |
->   None
-
--}
-
 data Threeway a = None | One a | Two a a
   deriving (Show, Eq, Functor, Foldable, Traversable)
   deriving Show1 via (Reflected1 Threeway)
 
-instance Zippable Threeway where
-  zip None       _          = None
-  zip _          None       = None
-  zip (One a)    (One b)    = One (a,b)
-  zip (One a)    (Two b _)  = One (a,b)
-  zip (Two a _)  (One b)    = One (a,b)
-  zip (Two a a') (Two b b') = Two (a,b) (a',b')
-
-instance Align Threeway where
+instance Semialign Threeway where
   align None      y           = fmap That y
   align x         None        = fmap This x
   align (One a)   (One b)     = One (These a b)
@@ -203,13 +74,19 @@ instance Align Threeway where
   align (Two a a') (One b)    = Two (These a b) (This a')
   align (Two a a') (Two b b') = Two (These a b) (These a' b')
 
-instance LatticeLike Threeway
-
-instance Top Threeway where
-  repeat a = Two a a
-
-instance Bottom Threeway where
+instance Align Threeway where
   nil = None
+
+instance Zip Threeway where
+  zip None       _          = None
+  zip _          None       = None
+  zip (One a)    (One b)    = One (a,b)
+  zip (One a)    (Two b _)  = One (a,b)
+  zip (Two a _)  (One b)    = One (a,b)
+  zip (Two a a') (Two b b') = Two (a,b) (a',b')
+
+instance Repeat Threeway where
+  repeat a = Two a a
 
 instance Eq1 Threeway where
   liftEq _ None None = True
@@ -243,7 +120,7 @@ data Pentagon a = D0 | D1 a | D2 a | D3 a | D4 a a
   deriving (Show, Eq, Functor, Foldable, Traversable)
   deriving (Show1) via (Reflected1 Pentagon)
 
-instance Zippable Pentagon where
+instance Zip Pentagon where
   zip D0        _         = D0
   zip _         D0        = D0
   zip (D1 a)    (D1 b)    = D1 (a,b)
@@ -258,8 +135,7 @@ instance Zippable Pentagon where
   zip (D4 a a') (D4 b b') = D4 (a,b) (a',b')
   zip x y                 = swap <$> zip y x
 
-
-instance Align Pentagon where
+instance Semialign Pentagon where
   align D0        y         = That <$> y
   align x         D0        = This <$> x
   
@@ -283,12 +159,10 @@ instance Align Pentagon where
   align (D4 a a') (D3 b)    = D4 (This a) (These a' b)
   align (D4 a a') (D4 b b') = D4 (These a b) (These a' b')
 
-instance LatticeLike Pentagon
-
-instance Top Pentagon where
+instance Repeat Pentagon where
   repeat a = D4 a a
 
-instance Bottom Pentagon where
+instance Align Pentagon where
   nil = D0
 
 instance Eq1 Pentagon where
@@ -319,7 +193,7 @@ newtype R a = Nest [[a]]
   deriving (Show, Eq, Functor, Foldable, Traversable)
   deriving (Show1) via (Reflected1 R)
 
-instance Zippable R where
+instance Zip R where
   zip (Nest ass) (Nest bss) = Nest $ zipR ass bss
     where
       zipR []   _     = []
@@ -340,7 +214,7 @@ instance Zippable R where
             [] -> error "Should never happen!"
             (zs:zss) -> ((x,y):zs):zss
 
-instance Align R where
+instance Semialign R where
   align (Nest ass) (Nest bss)
     | null ass                = That <$> Nest bss
     | null bss                = This <$> Nest ass
@@ -349,9 +223,7 @@ instance Align R where
     where
       shape = fmap (() <$)
 
-instance LatticeLike R
-
-instance Bottom R where
+instance Align R where
   nil = Nest []
 
 instance Eq1 R where
@@ -372,62 +244,61 @@ sqrti = round . (sqrt :: Double -> Double) . fromIntegral
 ---- Checks ----
 
 propIdempotenceP
-  :: forall f. (Zippable f,
+  :: forall f. (Zip f,
                 forall a. Show a => Show (f a),
                 forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> Property
 propIdempotenceP _ xs = zip xs xs === fmap (\x -> (x, x)) xs
 
 propCommutativeP
-  :: forall f. (Zippable f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Zip f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> f Int -> Property
 propCommutativeP _ xs ys = zip xs ys === fmap swap (zip ys xs)
 
 propAssociativeP
-  :: forall f. (Zippable f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Zip f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> f Int -> f Char -> Property
 propAssociativeP _ xs ys zs =
   fmap assoc (zip xs (zip ys zs)) === zip (zip xs ys) zs
 
 propUnitP
-  :: forall f. (Top f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Repeat f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> Int -> f Bool -> Property
 propUnitP _ a xs = zip (repeat a) xs === fmap ((,) a) xs
 
 propIdempotenceT
-  :: forall f. (Align f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Semialign f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> Property
 propIdempotenceT _ xs = align xs xs === fmap (\x -> These x x) xs
 
 propCommutativeT
-  :: forall f. (Align f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Semialign f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> f Int -> Property
 propCommutativeT _ xs ys = align xs ys === fmap swapT (align ys xs)
 
 propAssociativeT
-  :: forall f. (Align f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Semialign f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> f Int -> f Char -> Property
 propAssociativeT _ xs ys zs =
   fmap assocT (align xs (align ys zs)) === align (align xs ys) zs
 
 propUnitT
-  :: forall f. (Bottom f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Align f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> Property
 propUnitT _ xs = align (nil :: f ()) xs === fmap That xs
 
-
 propAbsorptionPT
-  :: forall f. (LatticeLike f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Zip f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> f Int -> Property
 propAbsorptionPT _ xs ys = (fst <$> zip xs (align xs ys)) === xs
 
 propAbsorptionTP
-  :: forall f. (LatticeLike f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Zip f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Bool -> f Int -> Property
 propAbsorptionTP _ xs ys = (fstT <$> align xs (zip xs ys)) === (Just <$> xs)
 
 propAlignToList
-  :: forall f. (Align f, Foldable f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
+  :: forall f. (Semialign f, Foldable f, forall a. Show a => Show (f a), forall a. Eq a => Eq (f a))
   => Proxy f -> f Int -> f Int -> Property
 propAlignToList _ xs ys =
   let xys = align xs ys
@@ -439,7 +310,7 @@ qc :: Testable prop => prop -> IO ()
 qc = quickCheckWith stdArgs{ maxSuccess = 500, maxSize = 100 }
 
 checkLatticeLike
-  :: forall f. (LatticeLike f
+  :: forall f. (Zip f
                , Foldable f
                , forall a. Show a => Show (f a)
                , forall a. Eq a => Eq (f a)
@@ -469,7 +340,7 @@ checkLatticeLike al =
      qc $ propAlignToList al
 
 checkZipUnit 
-  :: forall f. (Top f
+  :: forall f. (Repeat f
                , forall a. Show a => Show (f a)
                , forall a. Eq a => Eq (f a)
                , forall a. Arbitrary a => Arbitrary (f a))
@@ -479,7 +350,7 @@ checkZipUnit al =
      qc $ propUnitP al
 
 checkAlignUnit 
-  :: forall f. (Bottom f
+  :: forall f. (Align f
                , forall a. Show a => Show (f a)
                , forall a. Eq a => Eq (f a)
                , forall a. Arbitrary a => Arbitrary (f a))

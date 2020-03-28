@@ -93,6 +93,7 @@ instance (Polynomial f, Polynomial g) => Polynomial (f :*: g) where
   fromPoly (P (TagMul tagF tagG) rep) =
     fromPoly (P tagF (rep . Left)) :*: fromPoly (P tagG (rep . Right))
 
+{-
 data TagComp f g r where
   TagComp :: Reifies tagFn (x -> Exists g) => f x -> Proxy tagFn -> TagComp f g (DSum x tagFn)
 
@@ -116,3 +117,4 @@ instance (Polynomial f, Polynomial g) => Polynomial (f :.: g) where
           case reflect tagFnName x of
             Ex tagG -> fromPoly $ P tagG (\y -> rep $ DSum x tagFnName (tagG, y))
     in Comp1 $ fromPoly (P tagF repF)
+-}
