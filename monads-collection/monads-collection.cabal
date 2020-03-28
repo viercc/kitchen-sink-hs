@@ -23,6 +23,7 @@ library
                      Monad.SetMonad,
                      Monad.ShrinkOnce,
                      Monad.Esoteric,
+                     Monad.Builder,
                      MonadLaws
   build-depends:     base >=4.11 && <5
                    , containers
@@ -40,11 +41,19 @@ test-suite esoteric-test
   default-language: Haskell2010
   ghc-options:      -rtsopts -with-rtsopts=-M2m
 
-test-suite monad-queue-test
-  type:    exitcode-stdio-1.0
+executable monad-queue-test
   main-is: QueueTest.hs
   hs-source-dirs: test
   build-depends: base >=4.11 && <5
                , monads-collection
   default-language: Haskell2010
   ghc-options:      -rtsopts -with-rtsopts=-M2m
+
+executable monad-builder-test
+  main-is: BuilderTest.hs
+  hs-source-dirs: test
+  build-depends: base >=4.11 && <5
+               , mtl
+               , monads-collection
+  default-language: Haskell2010
+  ghc-options:      -rtsopts -with-rtsopts=-M50m

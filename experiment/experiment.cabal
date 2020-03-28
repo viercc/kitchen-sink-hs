@@ -1,0 +1,49 @@
+cabal-version:       3.0
+name:                experiment
+version:             0.1.0.0
+homepage:            https://github.com/githubuser/experiment#readme
+license:             BSD-3-Clause
+license-file:        LICENSE
+author:              Koji Miyazato
+copyright:           2018-2020 Koji Miyazato
+build-type:          Simple
+extra-source-files:  README.md
+
+common basics
+  build-depends:       base >= 4.10 && < 5
+                       -- Basic techs
+                     , mtl
+                     , deepseq
+                     , QuickCheck
+                     
+                     , ghc-prim
+                     , containers
+                     , unordered-containers
+                     , vector
+  ghc-options:         -Wall -Wcompat
+
+common algo
+  build-depends: data-ordlist
+               , array
+               , witherable
+               , these
+               , semialign
+               , data-memocombinators
+
+common math
+  build-depends: random
+               , arithmoi
+               , integer-logarithms
+               , Decimal
+
+common theories
+  build-depends: reflection
+               , constraints
+               , contravariant
+               , bifunctors
+               , profunctors
+               , recursion-schemes
+
+executable experiment-configured
+  import: basics, algo, math, theories
+  main-is: ok.hs

@@ -1,2 +1,2 @@
-packages: ./experiment.cabal
 optional-packages: ./*/*.cabal, ./*/*/*.cabal
+
