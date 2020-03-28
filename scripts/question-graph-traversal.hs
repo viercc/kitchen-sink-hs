@@ -1,6 +1,7 @@
 #!/usr/bin/env cabal
 {- cabal:
 build-depends: base, containers, pipes, deepseq
+ghc-options:   -rtsopts -with-rtsopts=-s
 -}
 module Main where
 
@@ -19,7 +20,7 @@ allNodes Empty = return ()
 allNodes toVisit@(x :<| xs) = do
   neighbours <- lift $ S.fromList <$> getNeighbours  x
   let newNodesToVisit = xs >< neighbours
-  lift . putStrLn $ "LENGTH   " <> show (S.length newNodesToVisit)
+  -- lift . putStrLn $ "LENGTH   " <> show (S.length newNodesToVisit)
   each neighbours
   allNodes newNodesToVisit
 

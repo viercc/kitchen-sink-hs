@@ -1,3 +1,7 @@
+#!/usr/bin/env cabal
+{- cabal:
+build-depends: base
+-}
 module Main(main) where
 
 import System.Environment

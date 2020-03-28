@@ -34,7 +34,7 @@ newtype Set a = Set { elems_s :: [a] }
   deriving newtype Show
 
 instance Eq a => IsList (Set a) where
-  type Elem (Set a) = a
+  type Item (Set a) = a
   fromList :: [a] -> Set a
   fromList = Set . nub
 
@@ -71,10 +71,11 @@ smap_s f (Set s) = fromList $ map f s
 
 -------------------------------
 
-newtype PureSet = PureSet { elems_p :: Set PureSet } deriving (Show, Eq)
+newtype PureSet = PureSet { elems_p :: Set PureSet }
+  deriving newtype (Show, Eq)
 
 instance IsList PureSet where
-  type Elem PureSet = PureSet
+  type Item PureSet = PureSet
   fromList = PureSet . fromList
   toList = toList . elems_p
 
