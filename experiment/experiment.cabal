@@ -16,12 +16,15 @@ library
                    GenericN, HMatchable, Heap, LCS, LatticeLike, ListT,
                    LogRwd, Matrix, MatrixCatamorphism,
                    Ordinal, Polynomial, Readerize,
-                   Selective, Selective2, TreesThatGrow
+                   Selective, Selective2, TreesThatGrow,
+                   ListTVia
   build-depends:       base >= 4.10 && < 5
                      , mtl
+                     , free
                      , data-ordlist
                      , ghc-prim
                      , containers
+                     , vector
                      , reflection
                      , these
                      , semialign
