@@ -29,6 +29,10 @@ newtype ListT m a = ListT { runListT :: FreeT ((,) a) m () }
 newtype FreeT' m f b = FreeT' { unFreeT' :: FreeT f m b }
     deriving (Applicative, Monad) via (FreeT f m)
 
+-- Sadly, Functor (FreeT m f) uses liftM instead of fmap,
+-- meaning (Monad m, Functor f) => Functor (FreeT m f).
+-- Maybe that was due to backward compatibility,
+-- but I want only (Functor m, Functor f) => ... 
 instance (Functor m, Functor f) => Functor (FreeT' m f) where
   fmap f (FreeT' mx) = FreeT' (go mx)
     where go = FreeT . fmap (bimap f go) . runFreeT
@@ -36,9 +40,11 @@ instance (Functor m, Functor f) => Functor (FreeT' m f) where
 -- Natural
 type (~>) f g = forall x. f x -> g x
 
+-- functor on @Functor@s
 class (forall g. Functor g => Functor (ff g)) => FFunctor ff where
     ffmap :: (Functor g, Functor h) => (g ~> h) -> (ff g ~> ff h)
 
+-- monad on @Functor@s
 class FFunctor ff => FMonad ff where
     fpure :: (Functor g) => g ~> ff g
     fjoin :: (Functor g) => ff (ff g) ~> ff g
@@ -46,6 +52,7 @@ class FFunctor ff => FMonad ff where
 instance Functor m => FFunctor (FreeT' m) where
     ffmap f = FreeT' . hoistF f . unFreeT'
 
+-- Same function from "free" uses (Monad m) => ...
 hoistF :: forall f g m. (Functor f, Functor m) => (f ~> g) -> FreeT f m ~> FreeT g m
 hoistF fg =
   let fg' :: forall a. FreeF f a ~> FreeF g a
@@ -94,6 +101,7 @@ deriving via (FMonadList (FreeT' m))
 deriving via (FMonadList (FreeT' m))
   instance Monad m => Monad (ListT m)
 
+-- deriving Monoid is easy!
 deriving via (Ap (FreeT ((,) a) m) ())
   instance Monad m => Semigroup (ListT m a)
 
