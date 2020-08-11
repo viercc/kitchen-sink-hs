@@ -15,7 +15,6 @@ module ListTVia where
 
 import Data.Kind
 import Control.Monad.Trans
-import Control.Monad.Writer (WriterT(..))
 import Control.Monad.Trans.Free
 
 import Control.Monad (ap)
@@ -30,12 +29,14 @@ newtype FreeT' m f b = FreeT' { unFreeT' :: FreeT f m b }
     deriving (Applicative, Monad) via (FreeT f m)
 
 -- Sadly, Functor (FreeT m f) uses liftM instead of fmap,
--- meaning (Monad m, Functor f) => Functor (FreeT m f).
--- Maybe that was due to backward compatibility,
--- but I want only (Functor m, Functor f) => ... 
+-- meaning (Monad m, Functor f) => Functor (FreeT f m).
+-- Maybe that was for backward compatibility,
+-- but I want (Functor m, Functor f) => ...
 instance (Functor m, Functor f) => Functor (FreeT' m f) where
-  fmap f (FreeT' mx) = FreeT' (go mx)
-    where go = FreeT . fmap (bimap f go) . runFreeT
+  fmap f (FreeT' mx) = FreeT' (fmapFree' f mx)
+
+fmapFree' :: (Functor f, Functor m) => (a -> b) -> FreeT f m a -> FreeT f m b
+fmapFree' f = let go = FreeT . fmap (bimap f go) . runFreeT in go
 
 -- Natural
 type (~>) f g = forall x. f x -> g x
@@ -48,6 +49,38 @@ class (forall g. Functor g => Functor (ff g)) => FFunctor ff where
 class FFunctor ff => FMonad ff where
     fpure :: (Functor g) => g ~> ff g
     fjoin :: (Functor g) => ff (ff g) ~> ff g
+
+
+
+{-
+
+FFunctor laws:
+   ffmap id = id
+   ffmap f . ffmap g = ffmap (f . g)
+
+FMonad laws:
+
+[fpure is natural in g]
+
+    ∀(n :: g ~> h). ffmap n . fpure = fpure . n
+
+[fjoin is natural in g]
+
+    ∀(n :: g ~> h). ffmap n . fjoin = fjoin . ffmap (ffmap n)
+
+[Left unit]
+
+    fjoin . fpure = id
+
+[Right unit]
+
+    fjoin . fmap fpure = id
+
+[Associativity]
+
+    fjoin . fjoin = fjoin . ffmap fjoin
+
+-}
 
 instance Functor m => FFunctor (FreeT' m) where
     ffmap f = FreeT' . hoistF f . unFreeT'
@@ -88,9 +121,121 @@ instance (FMonad mm) => Monad (FMonadList mm) where
     return a = FMonadList $ fpure (a, ())
     ma >>= k = join_ (fmap k ma)
       where
-        join_ = FMonadList . fjoin . ffmap plug . runFMonadList
-        plug :: forall a x. (FMonadList mm a, x) -> mm ((,) a) x
-        plug (m,x) = x <$ runFMonadList m
+        join_ = FMonadList . fjoin . ffmap (plug . first runFMonadList) . runFMonadList
+        plug :: forall f x. Functor f => (f (), x) -> f x
+        plug (f_,a) = a <$ f_
+
+{-
+
+Is it really lawful?
+
+(I'll skip `FreeT' m` being lawful `FMonad` part)
+
+Preparation:
+
+I'll use the following aliases:
+  wrap = FMonadList
+  unwrap = runFMonadList
+  pf = plug . first unwrap
+
+Using these aliases:
+  return = wrap . fpure . (, ())
+  join_  = wrap . fjoin . ffmap pf . unwrap
+
+Also, for any natural transformation `n :: f ~> g`,
+  Lemma [plugnat]
+  plug . first n :: (f (), b) -> g b
+   = \(f_, b) -> b <$ n f_
+     -- (b <$) = fmap (const b), and fmap commutes with n
+   = \(f_, b) -> n (b <$ f_)
+   = n . plug
+
+Note that they are all natural transformations:
+* ffmap _
+* fpure
+* fjoin
+
+(1) Left unit:
+
+join_ . return
+ = wrap . fjoin . ffmap pf . unwrap . wrap . fpure . (, ())
+ = wrap . fjoin . ffmap pf . fpure . (, ())
+   -- naturality of fpure
+ = wrap . fjoin . fpure . pf . (, ())
+                          ^^^^^^^^^^^
+   {
+     pf . (, ())
+      = plug . first unwrap . (, ())
+      = (() <$) . unwrap
+      = fmap (const () :: () -> ()) . unwrap
+      = fmap id . unwrap
+      = unwrap
+   }
+ = wrap . fjoin . fpure . unwrap
+   -- FMonad law
+ = wrap . id . unwrap
+ = id
+
+(2) Right unit:
+
+join_ . fmap return
+ = wrap . fjoin . ffmap pf . unwrap .
+   wrap . ffmap (first return) . unwrap
+ = wrap . fjoin . ffmap pf . ffmap (first return) . unwrap
+   -- FFunctor law
+ = wrap . fjoin . ffmap (pf . first return) . unwrap
+                         ^^^^^^^^^^^^^^^^^
+   {
+     pf . first return
+      = plug . first unwrap . first (wrap . ipure . (,()))
+      = plug . first (ipure . (,()))
+      = plug . first ipure . first (,())
+        -- [plugnat]
+      = ipure . plug . first (,())
+      = ipure . plug . (\(a,b) -> ((a,()), b))
+      = ipure . (\(a,b) -> b <$ (a, ()))
+      = ipure . (\(a,b) -> (a,b))
+      = ipure
+   }
+ = wrap . fjoin . ffmap ipure . unwrap
+   -- FMonad law
+ = wrap . id . unwrap
+ = id
+
+(3) Associativity:
+
+join_ . join_
+ = wrap . fjoin . ffmap pf . unwrap .
+   wrap . fjoin . ffmap pf . unwrap
+ = wrap . fjoin . ffmap pf . fjoin . ffmap pf . unwrap
+   -- naturality of fjoin
+ = wrap . fjoin . fjoin . ffmap (ffmap pf) . ffmap plug . unwrap
+ = wrap . fjoin . fjoin . ffmap (ffmap pf . pf) . unwrap
+
+join_ . fmap join_
+ = wrap . fjoin . ffmap pf . unwrap .
+   wrap . ffmap (first (wrap . fjoin . ffmap pf . unwrap)) . unwrap
+ = wrap . fjoin . ffmap pf .
+          ffmap (first (wrap . fjoin . ffmap pf . unwrap)) . unwrap
+ = wrap . fjoin .
+     ffmap (pf . first (wrap . fjoin . ffmap pf . unwrap)) . unwrap
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   {
+     pf . first (wrap . fjoin . ffmap pf . unwrap) 
+      = plug . first unwrap . first (wrap . fjoin . ffmap pf . unwrap)
+      = plug . first (fjoin . ffmap pf . unwrap)
+      = plug . first (fjoin . ffmap pf) . first unwrap
+        -- [plugnat]
+      = fjoin . ffmap pf . plug . first unwrap
+      = fjoin . ffmap pf . pf
+   }
+ = wrap . fjoin . ffmap (fjoin . ffmap pf . pf) . unwrap
+ = wrap . fjoin . ffmap fjoin . ffmap (ffmap pf . f) . unwrap
+   -- FMonad law
+ = wrap . fjoin . fjoin . ffmap (ffmap pf . pf) . unwrap
+ = join_ . join_
+
+-}
 
 deriving via (FMonadList (FreeT' m))
   instance Functor m => Functor (ListT m)
@@ -108,14 +253,17 @@ deriving via (Ap (FreeT ((,) a) m) ())
 deriving via (Ap (FreeT ((,) a) m) ())
   instance Monad m => Monoid (ListT m a)
 
-
-
+-- MonadTrans is specific to ListT
 instance MonadTrans ListT where
   lift ma = ListT . FreeT $ ma >>= \a -> return $ Free (a, return ())
 
-collect :: Monad m => ListT m a -> m [a]
-collect = fmap snd . runWriterT . foldFreeT step . runListT
-  where step (a,r) = WriterT $ return (r, [a])
+-- For test:
+collapse :: Monad m => ListT m () -> m ()
+collapse = iterT (\((), m) -> m) . runListT
+
+eval :: Show a => ListT IO a -> IO ()
+eval ma = collapse (ma >>= (lift . pr))
+  where pr a = putStrLn $ "ValueProduced[" ++ show a ++ "]"
 
 test1, test2, test3 :: ListT IO Int
 test1 = lift (print "A") >> mempty
