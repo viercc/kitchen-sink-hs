@@ -17,7 +17,7 @@ library
                    LogRwd, Matrix, MatrixCatamorphism,
                    Ordinal, Polynomial, Readerize,
                    Selective, Selective2, TreesThatGrow,
-                   ListTVia
+                   ListTVia, FMonadExamples
   build-depends:       base >= 4.10 && < 5
                      , mtl
                      , free
