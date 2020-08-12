@@ -50,8 +50,6 @@ class FFunctor ff => FMonad ff where
     fpure :: (Functor g) => g ~> ff g
     fjoin :: (Functor g) => ff (ff g) ~> ff g
 
-
-
 {-
 
 FFunctor laws:
@@ -79,6 +77,8 @@ FMonad laws:
 [Associativity]
 
     fjoin . fjoin = fjoin . ffmap fjoin
+
+More concrete examples are in FMonadExamples.hs
 
 -}
 
@@ -209,7 +209,7 @@ join_ . join_
    wrap . fjoin . ffmap pf . unwrap
  = wrap . fjoin . ffmap pf . fjoin . ffmap pf . unwrap
    -- naturality of fjoin
- = wrap . fjoin . fjoin . ffmap (ffmap pf) . ffmap plug . unwrap
+ = wrap . fjoin . fjoin . ffmap (ffmap pf) . ffmap pf . unwrap
  = wrap . fjoin . fjoin . ffmap (ffmap pf . pf) . unwrap
 
 join_ . fmap join_
