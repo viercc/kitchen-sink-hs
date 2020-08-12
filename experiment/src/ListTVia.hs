@@ -187,17 +187,17 @@ join_ . fmap return
                          ^^^^^^^^^^^^^^^^^
    {
      pf . first return
-      = plug . first unwrap . first (wrap . ipure . (,()))
-      = plug . first (ipure . (,()))
-      = plug . first ipure . first (,())
+      = plug . first unwrap . first (wrap . fpure . (,()))
+      = plug . first (fpure . (,()))
+      = plug . first fpure . first (,())
         -- [plugnat]
-      = ipure . plug . first (,())
-      = ipure . plug . (\(a,b) -> ((a,()), b))
-      = ipure . (\(a,b) -> b <$ (a, ()))
-      = ipure . (\(a,b) -> (a,b))
-      = ipure
+      = fpure . plug . first (,())
+      = fpure . plug . (\(a,b) -> ((a,()), b))
+      = fpure . (\(a,b) -> b <$ (a, ()))
+      = fpure . (\(a,b) -> (a,b))
+      = fpure
    }
- = wrap . fjoin . ffmap ipure . unwrap
+ = wrap . fjoin . ffmap fpure . unwrap
    -- FMonad law
  = wrap . id . unwrap
  = id
@@ -269,3 +269,54 @@ test1, test2, test3 :: ListT IO Int
 test1 = lift (print "A") >> mempty
 test2 = lift (print "B") >> pure 1
 test3 = lift (print "C") >> (pure 2 <> pure 3)
+
+
+---------------------------------
+
+{-
+
+FMonadList on various FMonad:
+(Note that `FMonad mm` doesn't imply `Monad (mm f)` or whatever)
+
+1. Free
+
+   FMonadList Free a
+    ~ Free (a,) ()
+    ~ [a]
+
+2. ReaderT e
+
+   FMonadList (ReaderT e) a
+    ~ ReaderT e (a,) ()
+    ~ e -> (a,())
+    ~ e -> a
+
+3. FMonad MaybeT
+
+   MaybeT (MaybeT m) a === m (Maybe (Maybe a))
+        |                         |
+        v fjoin                   v fmap join
+     MaybeT m a        === m (Maybe a)
+   
+   FMonadList MaybeT a
+    ~ (a, Maybe ())
+    ~ (a, Bool) by {False <-> Nothing, True <-> Just ()}
+    ~ Writer All a
+
+4. Maybe' f = I :+: f
+
+   data Maybe' f a = Nothing' a | Just' (f a)
+   
+   FMonadList Maybe' a
+    ~ Maybe' (a,) ()
+    ~ Either () (a,())
+    ~ Maybe
+
+5. Reader'
+
+   newtype Reader' f g x = Reader' (forall y. f y -> g (x, y))
+
+   instance FFunctor (Reader' f)
+
+   
+-}
