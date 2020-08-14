@@ -247,7 +247,7 @@ instead of just being a monoid.
 
 > fpure fa = StateT $ \s -> (,s) <$> fa 
 > fjoin = StateT . fjoin_ . fmap runStateT . runStateT
->   where fjoin_ mma s = fmap (fmap (joinGroup s)) $ joinReader mma
+>   where fjoin_ mma s = fmap (fmap (joinGroup s)) $ joinReader mma s
 >         joinReader = join
 >         joinGroup s ((x,s1),s2) = (x, s2 <> inv s <> s1)
 
