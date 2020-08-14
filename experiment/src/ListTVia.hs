@@ -21,6 +21,9 @@ import Control.Monad (ap)
 import Data.Monoid (Ap(..))
 import Data.Bifunctor
 
+{- Made FMonad module out of it! -}
+import FMonad
+
 type    ListT :: (Type -> Type) -> (Type -> Type)
 newtype ListT m a = ListT { runListT :: FreeT ((,) a) m () }
 
@@ -32,62 +35,12 @@ newtype FreeT' m f b = FreeT' { unFreeT' :: FreeT f m b }
 -- meaning (Monad m, Functor f) => Functor (FreeT f m).
 -- Maybe that was for backward compatibility,
 -- but I want (Functor m, Functor f) => ...
-instance (Functor m, Functor f) => Functor (FreeT' m f) where
-  fmap f (FreeT' mx) = FreeT' (fmapFree' f mx)
+fmapFreeT_ :: (Functor f, Functor m) => (a -> b) -> FreeT f m a -> FreeT f m b
+fmapFreeT_ f = let go = FreeT . fmap (bimap f go) . runFreeT in go
 
-fmapFree' :: (Functor f, Functor m) => (a -> b) -> FreeT f m a -> FreeT f m b
-fmapFree' f = let go = FreeT . fmap (bimap f go) . runFreeT in go
-
--- Natural
-type (~>) f g = forall x. f x -> g x
-
--- functor on @Functor@s
-class (forall g. Functor g => Functor (ff g)) => FFunctor ff where
-    ffmap :: (Functor g, Functor h) => (g ~> h) -> (ff g ~> ff h)
-
--- monad on @Functor@s
-class FFunctor ff => FMonad ff where
-    fpure :: (Functor g) => g ~> ff g
-    fjoin :: (Functor g) => ff (ff g) ~> ff g
-
-{-
-
-FFunctor laws:
-   ffmap id = id
-   ffmap f . ffmap g = ffmap (f . g)
-
-FMonad laws:
-
-[fpure is natural in g]
-
-    ∀(n :: g ~> h). ffmap n . fpure = fpure . n
-
-[fjoin is natural in g]
-
-    ∀(n :: g ~> h). ffmap n . fjoin = fjoin . ffmap (ffmap n)
-
-[Left unit]
-
-    fjoin . fpure = id
-
-[Right unit]
-
-    fjoin . fmap fpure = id
-
-[Associativity]
-
-    fjoin . fjoin = fjoin . ffmap fjoin
-
-More concrete examples are in FMonadExamples.hs
-
--}
-
-instance Functor m => FFunctor (FreeT' m) where
-    ffmap f = FreeT' . hoistF f . unFreeT'
-
--- Same function from "free" uses (Monad m) => ...
-hoistF :: forall f g m. (Functor f, Functor m) => (f ~> g) -> FreeT f m ~> FreeT g m
-hoistF fg =
+-- Same!
+transFreeT_ :: forall f g m. (Functor f, Functor m) => (f ~> g) -> FreeT f m ~> FreeT g m
+transFreeT_ fg =
   let fg' :: forall a. FreeF f a ~> FreeF g a
       fg' (Pure a) = Pure a
       fg' (Free fr) = Free (fg fr)
@@ -96,15 +49,23 @@ hoistF fg =
       go (FreeT mfx) = FreeT $ fmap (fg' . fmap go) mfx
   in go
 
+instance (Functor m, Functor f) => Functor (FreeT' m f) where
+    fmap f (FreeT' mx) = FreeT' (fmapFreeT_ f mx)
+
+instance Functor m => FFunctor (FreeT' m) where
+    ffmap f = FreeT' . transFreeT_ f . unFreeT'
+
 instance Monad m => FMonad (FreeT' m) where
-    fpure :: Functor g => g ~> FreeT' m g
+    fpure :: forall g. Functor g => g ~> FreeT' m g
     fpure gx = FreeT' (liftF gx)
+    
+    fjoin :: forall g. Functor g => FreeT' m (FreeT' m g) ~> FreeT' m g
+    fjoin =  FreeT' . fjoin_ . transFreeT_ unFreeT' . unFreeT'
+      where
+        fjoin_ :: FreeT (FreeT g m) m ~> FreeT g m
+        fjoin_ = retractT
 
-    fjoin :: Functor g => FreeT' m (FreeT' m g) ~> FreeT' m g
-    fjoin =  FreeT' . fjoin_ . transFreeT unFreeT' . unFreeT'
 
-fjoin_ :: (Monad m, Functor g) => FreeT (FreeT g m) m ~> FreeT g m
-fjoin_ = retractT
 
 newtype FMonadList mm a = FMonadList { runFMonadList :: mm ((,) a) () }
 

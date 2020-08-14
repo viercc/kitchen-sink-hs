@@ -21,17 +21,8 @@ whatever, but `FMonadList mm` is a `Monad`!)
 -}
 module FMonadExamples where
 
-import Data.Kind
-
-import Control.Monad
-import Control.Applicative
-import Data.Bifunctor
-import Control.Monad.Trans
-
-import Data.Functor.Compose
-import qualified Control.Monad.Free as Free
-
-import ListTVia
+import FMonad
+-- import ListTVia
 
 {-
 
@@ -40,16 +31,6 @@ import ListTVia
    FMonadList Free a
     ~ Free (a,) ()
     ~ [a]
--}
-
-instance FFunctor Free.Free where
-  ffmap = Free.hoistFree
-
-instance FMonad Free.Free where
-  fpure = Free.liftF
-  fjoin = Free.retract
-
-{-
 
 2. ReaderT e
 
@@ -65,16 +46,6 @@ instance FMonad Free.Free where
      ~ Compose m (a,) ()
      ~ m (a,())
      ~ m a
-
--}
-
-instance Functor f => FFunctor (Compose f) where
-    ffmap gh (Compose fga) = Compose (fmap gh fga)
-instance Monad f => FMonad (Compose f) where
-    fpure = Compose . return
-    fjoin = Compose . join . fmap getCompose . getCompose
-
-{-
 
 4. FMonad MaybeT
 
@@ -96,21 +67,7 @@ instance Monad f => FMonad (Compose f) where
      ~ (a, Ap m)
      ~ Writer (Ap m) a
 
--}
-
-newtype FlipCompose f g a = FlipCompose { getFlipCompose :: g (f a) }
-  deriving Functor
-
-instance Functor f => FFunctor (FlipCompose f) where
-    ffmap gh (FlipCompose gfa) = FlipCompose (gh gfa)
-
-instance Monad f => FMonad (FlipCompose f) where
-    fpure = FlipCompose . fmap return
-    fjoin = FlipCompose . fmap join . getFlipCompose . getFlipCompose
-
-
-{-
-4. Maybe' f = I :+: f
+6. Maybe' f = I :+: f
    
    FMonadList Maybe' a
     ~ Maybe' (a,) ()
@@ -131,31 +88,7 @@ instance FMonad Maybe' where
   fjoin (Just' (Nothing' a)) = Nothing' a
   fjoin (Just' (Just' fa))   = Just' fa
 
-{-
-7. Day
-
-   FMonadList (Day f) a
-    ~ Day f (a,) ()
-    ~ ∃x y. (x -> y -> (), f x, (a, y))
-    ~ ∃x y. ((), f x, (a, y))
-    ~ (f (), a)
-    ~ Writer (Ap f) a
--}
-
-data Day f g x = forall a b. Day (a -> b -> x) (f a) (g b)
-
-deriving instance Functor (Day f g)
-
-instance FFunctor (Day f) where
-    ffmap gh (Day ab_x fa gb) = Day ab_x fa (gh gb)
-
-instance (Applicative f) => FMonad (Day f) where
-    fpure ga = Day ($) (pure id) ga
-    fjoin (Day ab_x fa (Day cd_b fc gd)) =
-      let acd_x a c d = ab_x a (cd_b c d)
-      in Day ($) (liftA2 acd_x fa fc) gd
-
-{- Another functor related to Day -}
+-- Another functor related to Day
 newtype (:->:) f g x = ExpDay (forall a b. (x -> a -> b) -> f a -> g b)
 
 deriving instance Functor (f :->: g)
