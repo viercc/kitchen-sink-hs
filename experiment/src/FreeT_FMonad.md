@@ -71,16 +71,14 @@ newtype FreeT' m f b = FreeT' { unFreeT' :: FreeT f m b }
 fmapFreeT_ :: (Functor f, Functor m) => (a -> b) -> FreeT f m a -> FreeT f m b
 fmapFreeT_ f = FreeT . fmap (bimap f (fmapFreeT_ f)) . runFreeT
 
--- Same!
-transFreeT_ :: forall f g m. (Functor f, Functor m) => (f ~> g) -> FreeT f m ~> FreeT g m
-transFreeT_ fg =
-  let fg' :: forall a. FreeF f a ~> FreeF g a
-      fg' (Pure a) = Pure a
-      fg' (Free fr) = Free (fg fr)
+ffmapFreeF :: forall f g a. (f ~> g) -> FreeF f a ~> FreeF g a
+ffmapFreeF _  (Pure a)  = Pure a
+ffmapFreeF fg (Free fb) = Free (fg fb)
 
-      go :: FreeT f m ~> FreeT g m
-      go (FreeT mfx) = FreeT $ fmap (fg' . fmap go) mfx
-  in go
+-- Same!
+transFreeT_ :: forall f g m. (Functor g, Functor m) => (f ~> g) -> FreeT f m ~> FreeT g m
+transFreeT_ fg =
+  let go = FreeT . fmap (fmap go . ffmapFreeF fg) . runFreeT in go
 
 instance (Functor m, Functor f) => Functor (FreeT' m f) where
     fmap f (FreeT' mx) = FreeT' (fmapFreeT_ f mx)
