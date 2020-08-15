@@ -97,6 +97,14 @@ instance Monad m => FMonad (FreeT' m) where
       where
         fjoin_ :: FreeT (FreeT g m) m ~> FreeT g m
         fjoin_ = retractT
+
+-- Copy-pasted from "free"
+retractT :: (MonadTrans t, Monad (t m), Monad m) => FreeT (t m) m a -> t m a
+retractT (FreeT m) = do
+  val <- lift m
+  case val of
+    Pure x -> return x
+    Free y -> y >>= retractT
 ```
 
 ### Monad morphism
@@ -110,178 +118,326 @@ monad morphism iff
 ### Definitions for proof
 
 ``` haskell
-ffirst :: (Monad m, Monad n, Functor f) => (m ~> n) -> (FreeT' m f ~> FreeT' n f)
-ffirst nt = FreeT' . hoistFreeT nt . unFreeT'
+inr :: (Monad m) => m ~> FreeT f m
+inr = lift
+inr mx = FreeT $ fmap Pure mx
 
-hoistFreeT :: (Monad n, Functor f) => (m ~> n) -> (FreeT f m ~> FreeT f n)
-hoistFreeT nt = FreeT . nt . fmap (fmap (hoistFreeT nt)) . runFreeT
-
-fsecond :: (Functor m, Functor f, Functor g) => (f ~> g) -> (FreeT' m f ~> FreeT' m g)
-fsecond = ffmap
-
-inl :: (Monad m) => m ~> FreeT' m f
-inl = FreeT' . lift
-inl mx = FreeT' . FreeT $ fmap Pure mx
-
-inr :: (Functor f, Monad m) => f ~> FreeT' m f
-inr = fpure
-inr gx = FreeT' (liftF gx)
-       = FreeT' . FreeT . return @m . Free . fmap (return @(FreeT m f)) $ mx
-
-nabla :: (Monad m) => FreeT' m m ~> m
-nabla = runIdentityT . foldFreeT IdentityT . unFreeT'
-
--- Copy-pasted from "free"
-foldFreeT :: (Monad m, MonadTrans t, Monad (t m)) => (f ~> t m) -> (FreeT f m ~> t m)
-foldFreeT f (FreeT m) = lift m >>= foldFreeF
-  where
-    foldFreeF (Pure a) = return a
-    foldFreeF (Free as) = f as >>= foldFreeT f
+inl :: (Functor f, Monad m) => f ~> FreeT f m
+inl = liftF
+inl gx = FreeT . return @m . Free . fmap (return @(FreeT m f)) $ mx
 ```
-
-### Lemma
-
-I'll use these equations for `return` and `join` of
-`FreeT`:
-
-```haskell
-return @(FreeT f m) = FreeT . return @m . Pure
-join (FreeT m) = FreeT $
-  m >>= \v -> case v of
-    Pure a -> runFreeT a
-    Free w -> return (Free (fmap join w))
-join = FreeT . join . fmap (fromFreeF runFreeT (return . Free . fmap join)) . runFreeT
-
-fromFreeF :: (a -> r) -> (f b -> r) -> FreeF f a b -> r
-```
-
-Use the following lemma several times:
-
-```haskell
-fmap f . join
- = FreeT . fmap (bimap f (fmap f)) . runFreeT .
-   FreeT . join . fmap (fromFreeF runFreeT (return . Free . fmap join)) . runFreeT
- = FreeT . fmap (bimap f (fmap f)) .
-   join . fmap (fromFreeF runFreeT (return . Free . fmap join)) . runFreeT
- = FreeT . join .
-   fmap (fmap (bimap f (fmap f))) .
-   fmap (fromFreeF runFreeT (return . Free . fmap join)) . runFreeT
- = FreeT . join .
-   fmap (fmap (bimap f (fmap f)) .
-         fromFreeF runFreeT (return . Free . fmap join)) .
-   runFreeT
- = FreeT . join .
-   fmap (fromFreeF (fmap (bimap f (fmap f)) . runFreeT)
-                   (fmap (bimap f (fmap f)) . (return . Free . fmap join))) .
-   runFreeT
- = FreeT . join .
-   fmap (fromFreeF (runFreeT . fmap f)
-                   (return . bimap f (fmap f) . Free . fmap join)) .
-   runFreeT
- = FreeT . join .
-   fmap (fromFreeF (runFreeT . fmap f)
-                   (return . Free . fmap (fmap f) . fmap join)) .
-   runFreeT
- = FreeT . join .
-   fmap (fromFreeF (runFreeT . fmap f) (return . Free . fmap (fmap f . join))) .
-   runFreeT
-```
-
 
 ## Proof 
 
-### Lemma (universality)
+### Universal Property
 
 **Statement:** Let `m,n` be a `Monad`, `f` be a `Functor`.
-For all monad morphism `nt1 :: m ~> n` and natural transformation `nt2 :: f ~> n`, there exists
-a unique monad morphism `nt :: FreeT' m f ~> n` with properties
+For all natural transformation `nt1 :: f ~> n` and monad morphism `nt2 :: m ~> n`, there exists
+a unique monad morphism `nt :: FreeT f m ~> n` with properties
 
 * `nt . inl = nt1`
 * `nt . inr = nt2`
 
 **Proof:**
 
-The following `eitherFreeT nt1 nt2` is the monad morphism `FreeT' m f ~> n`.
+The following `eitherFreeT nt1 nt2` is the monad morphism `FreeT f m ~> n`.
 
 ```haskell
-eitherFreeT :: (Monad m, Monad n, Functor f) => (m ~> n) -> (f ~> n) -> (FreeT' m f ~> n)
-eitherFreeT nt1 nt2 = go . unFreeT'
+eitherFreeT :: (Monad m, Monad n, Functor f) => (f ~> n) -> (m ~> n) -> (FreeT f m ~> n)
+eitherFreeT nt1 nt2 = go
   where
     go ma =
-      do v <- nt1 (runFreeT ma)
+      do v <- nt2 (runFreeT ma)
          case v of
            Pure a  -> return a
-           Free fm -> nt2 fm >>= go
+           Free fm -> nt1 fm >>= go
 ```
 
-**(1)** It is actually a monad morphism. `go . return = return` is straightforward.
+**(1)** It is actually a monad morphism.
+
+`go . return = return` is straightforward.
 
 ```haskell
 go $ return a
   = go (FreeT (return (Pure a)))
-  = do v <- nt1 (return (Pure a))
+  = do v <- nt2 (return (Pure a))
        case v of
          Pure a  -> return a
-         Free fm -> nt2 fm >>= go
-    -- nt1 . return = return
+         Free fm -> nt1 fm >>= go
+    -- nt2 . return = return
   = case Pure a of
       Pure a  -> return a
-      Free fm -> nt2 fm >>= g0
+      Free fm -> nt1 fm >>= g0
   = return a
 ```
 
-`go . join = join . fmap go . go` is shown inductively.
+`go . join` and `join . fmap go . go` are equal by induction.
 
 ```hasekll
 join . fmap go . go $ mma
  = go mma >>= go
- = do v <- nt1 $ runFreeT mma
+ = do v <- nt2 $ runFreeT mma
       ma' <- case v of
         Pure ma -> return ma
-        Free fm -> nt2 fm >>= go
+        Free fm -> nt1 fm >>= go
       go ma'
- = do v <- nt1 $ runFreeT mma
+ = do v <- nt2 $ runFreeT mma
       case v of
         Pure ma -> return ma     >>= go
-        Free fm -> nt2 fm >>= go >>= go
- = do v <- nt1 $ runFreeT mma
+        Free fm -> nt1 fm >>= go >>= go
+ = do v <- nt2 $ runFreeT mma
       case v of
         Pure ma -> go ma
-        Free fm -> nt2 fm >>= join . fmap go . go
+        Free fm -> nt1 fm >>= join . fmap go . go
 
 go $ join mma
   = go . FreeT $ runFreeT mma >>= \v -> case v of
       Pure a  -> runFreeT a
       Free fm -> return (Free (fmap join fm))
-  = do v' <- nt1 $ do
+  = do v' <- nt2 $ do
          v <- runFreeT mma
          case v of
            Pure ma -> runFreeT ma
            Free fm -> return $ Free (fmap join fm)
        case v' of
          Pure a  -> return a
-         Free fm -> nt2 fm >>= go
-    -- nt1 is a monad morphism
-  = do v <- nt1 mma
+         Free fm -> nt1 fm >>= go
+    -- nt2 is a monad morphism
+  = do v <- nt2 mma
        v' <- case v of
-         Pure ma -> nt1 $ runFreeT ma
+         Pure ma -> nt2 $ runFreeT ma
          Free fm -> return $ Free (fmap join fm)
        case v' of
          Pure a  -> return a
-         Free fm -> nt2 fm >>= go
-  = do v <- nt1 mma
+         Free fm -> nt1 fm >>= go
+  = do v <- nt2 mma
        case v of
          Pure ma -> do
            ---- This part is equal to (go ma) ----
-           v' <- nt1 $ runFreeT ma
+           v' <- nt2 $ runFreeT ma
            case v' of
              Pure a  -> return a
-             Free fm -> nt2 fm >>= go
+             Free fm -> nt1 fm >>= go
            ---------------------------------------
-         Free fm -> nt2 (fmap join fm) >>= go
-  = do v <- nt1 mma
+         Free fm -> nt1 (fmap join fm) >>= go
+  = do v <- nt2 mma
        case v of
          Pure ma -> go ma
-         Free fm -> nt2 fm >>= go . join
+         Free fm -> nt1 fm >>= go . join
 ```
 
+**(2)** Composing with injections gets original arrows back.
+
+```haskell
+go $ inl fa
+ = do v <- nt2 . runFreeT $ FreeT . return . Free $ fmap return fa
+      case v of
+        Pure a  -> return a
+        Free fm -> nt1 fm >>= go
+ = case Free (fmap return fa) of
+     Pure a  -> return a
+     Free fm -> nt1 fm >>= go
+ = nt1 (fmap return fm) >>= go
+ = fmap return (nt1 fm) >>= go
+ = nt1 fm >>= go . return  -- go . return = return, we just proved above
+ = nt1
+
+go $ inr ma
+ = do v <- nt2 . runFreeT $ FreeT (fmap Pure ma)
+      case v of
+        Pure a  -> return a
+        Free fm -> nt1 fm >>= go
+ = do v <- fmap Pure (nt2 ma)
+      case v of
+        -- v is always (Pure a)!
+        Pure a  -> return a
+        Free fm -> nt1 fm >>= go
+ = do a <- nt2 ma
+      return a
+ = nt2 ma
+```
+
+**(3)** Such monad morphism is unique.
+
+Suppose `nt' :: FreeT f m ~> n` is a monad morphism with a property
+`nt' . inl = nt1` and `nt' . inr = nt2`. It can be shown that `nt' = eitherFreeT nt1 nt2`.
+
+*Lemma 3-1.* For all monad morphism `after :: n ~> n'`, `after . eitherFreeT nt1 nt2 = eitherFreeT (after . nt1) (after . nt2)`.
+
+```haskell
+go = eitherFreeT nt1 nt2
+after . go $ ma
+ = after $ do
+     v <- nt2 (runFreeT ma)
+     case v of
+       Pure a  -> return a
+       Free fm -> nt1 fm >>= go
+ = do v <- after . nt2 $ runFreeT ma
+      case v of
+        Pure a  -> after (return a)
+        Free fm -> after (nt1 fm >>= go)
+ = do v <- (after . nt2) $ runFreeT ma
+      case v of
+        Pure a  -> return a
+        Free fm -> (after . nt1) fm >>= (after . go)
+
+go' = eitherFreeT (after . nt1) (after . nt2)
+go' ma
+ = do v <- (after . nt2) $ runFreeT ma
+      case v of
+        Pure a  -> return a
+        Free fm -> (after . nt1) fm >>= go'
+```
+
+`after . go` and `go'` are equal by induction.
+
+*Lemma 3-2.* `eitherFreeT inl inr = id`
+
+```haskell
+go = eitherFreeT inl inr
+
+go ma
+ = do v <- inr $ runFreeT ma
+      case v of
+        Pure a  -> return a
+        Free fm -> inl fm >>= go
+ = do v <- lift $ runFreeT ma
+      case v of
+        Pure a  -> return a
+        Free fm -> liftF fm >>= go
+ = do v <- FreeT $ fmap Pure $ runFreeT ma
+      case v of
+        Pure a  -> return a
+        Free fm -> (FreeT $ return (Free (fmap return fm))) >>= go
+ = FreeT $ do
+     vv <- fmap Pure $ runFreeT ma
+     case vv of
+       Pure v -> case v of
+         Pure a  -> runFreeT $ return a
+         Free fm -> runFreeT $ (FreeT $ return (Free (fmap return fm))) >>= go
+       Free _ -> {- Omit -}
+ = FreeT $ do
+     v <- runFreeT ma
+     case v of
+       Pure a  -> runFreeT $ return a
+       Free fm -> runFreeT $ (FreeT $ return (Free (fmap return fm))) >>= go
+ = FreeT $ do
+     v <- runFreeT ma
+     case v of
+       Pure a  -> runFreeT $ FreeT $ return (Pure a)
+       Free fm -> runFreeT $ FreeT $
+         do v2 <- return (Free (fmap return fm)))
+            case v2 of
+              Pure _  -> {- Omit -}
+              Free fm -> return $ Free (fmap (>>= go) fm)
+ = FreeT $ do
+     v <- runFreeT ma
+     case v of
+       Pure a  -> return (Pure a)
+       Free fm -> return $ Free (fmap (>>= go) (fmap return fm))
+ = FreeT $ do
+     v <- runFreeT ma
+     return $ case v of
+       Pure a  -> Pure a
+       Free fm -> Free (fmap go fm)
+ = FreeT . fmap (bimap id go) . runFreeT $ ma
+ = fmap id ma
+ = ma
+```
+
+By lemma *3-1* and *3-2*, 
+
+```haskell
+eitherFreeT nt1 nt2
+ = eitherFreeT (nt' . inl) (nt' . inr)
+ = nt' . eitherFreeT inl inr
+ = nt'
+```
+
+Thus there are only one monad morphism with these properties.
+
+### Corollary of the universal property
+
+`transFreeT_` maps "right" component of `FreeT f m`, and commutes with `eitherFreeT`
+in very expected way.
+
+```haskell
+transFreeT_ f . inr
+ = transFreeT_ f . FreeT . fmap Pure
+ = FreeT . fmap Pure
+ = inr
+
+transFreeT_ f . inl
+ = transFreeT_ f . FreeT . return . Free . fmap return
+ = FreeT . return . Free . f . fmap (transFreeT_ f . return)
+ = FreeT . return . Free . fmap return . f
+ = inl . f
+
+transFreeT_ f = eitherFreeT (inl . f) inr
+
+eitherFreeT nt1 nt2 . transFreeT_ f
+ = eitherFreeT (eitherFreeT nt1 nt2 . transFreeT_ f . inl)
+               (eitherFreeT nt1 nt2 . transFreeT_ f . inr)
+ = eitherFreeT (eitherFreeT nt1 nt2 . inl . f) (eitherFreeT nt1 nt2 . inr)
+ = eitherFreeT (nt1 . f) (nt2) 
+```
+
+### `FMonad` laws
+
+To ignore newtype wrapping, I'll use the following instead of `ffmap, fpure, fjoin`:
+
+```haskell
+ffmap_ :: (Functor f, Functor m) => (f ~> g) -> (FreeT f m ~> FreeT g m)
+ffmap_ = transFreeT_
+
+fpure_ :: (Functor f, Monad m) => f ~> FreeT f m
+fpure_ = inl
+
+fjoin_ :: (Functor f, Monad m) => FreeT (FreeT f m) m ~> FreeT f m
+fjoin_ = retractT
+```
+
+`fjoin_ = eitherFreeT id inr` by the following transformation of the definition:
+
+```haskell
+fjoin_ = retractT_
+ = do val <- lift m
+      case val of
+        Pure x -> return x
+        Free y -> y >>= retractT
+ = do val <- inr m
+      case val of
+        Pure x -> return x
+        Free y -> id y >>= retractT
+ = eitherFreeT id inr
+```
+
+**Left Unit**: `fjoin_ . fpure_ = id`
+
+`fjoin_ . fpure_ = eitherFreeT id inr . inl = id` by the property of `eitherFreeT`.
+
+**Right Unit**: `fjoin_ . ffmap_ fpure_`
+
+Can be calculated using the universal property.
+
+```haskell
+ffmap_ fpure_
+ = transFreeT_ inl
+ = eitherFreeT (inl . inl) inr
+fjoin_ . ffmap fpure_
+ = eitherFreeT id inr . eitherFreeT (inl . inl) inr 
+ = eitherFreeT (eitherFreeT id inr . inl . inl) (eitherFreeT id inr . inr)
+ = eitherFreeT inl inr
+ = id
+```
+
+**Associativity**: `fjoin_ . fjoin_ = fjoin_ . ffmap_ fjoin_`
+
+```hasekell
+fjoin_ . fjoin_
+ = eitherFreeT id inr . eitherFreeT id inr
+ = eitherFreeT (eitherFreeT id inr . id) (eitherFreeT id inr . inr)
+ = eitherFreeT (eitherFreeT id inr) inr
+ = eitherFreeT id inr . transFreeT_ (eitherFreeT id inr)
+ = fjoin_ . ffmap_ fjoin_
+```

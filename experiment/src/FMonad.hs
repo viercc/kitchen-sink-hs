@@ -23,13 +23,20 @@ module FMonad(
   FMonad(..),
 
   FlipCompose(..),
-  Day(..)
+  Day(..),
+  
+  FreeT'(..),
+
+  -- * utilities
+  inr, inl, eitherFreeT,
+  firstFreeT, secondFreeT
 ) where
 
 import Data.Kind
 
 import Control.Applicative
 import Control.Monad (join)
+import Data.Bifunctor
 import Data.Functor.Classes
 
 import Data.Functor.Identity
@@ -42,7 +49,8 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.State
 
-import qualified Control.Monad.Free as Free
+import qualified Control.Monad.Free       as NonTrans
+import           Control.Monad.Trans.Free
 
 -- | Natural
 type (~>) f g = forall x. f x -> g x
@@ -68,8 +76,8 @@ instance Functor f => FFunctor (Product f) where
 instance Functor f => FFunctor (Compose f) where
     ffmap gh = Compose . fmap gh . getCompose
 
-instance FFunctor Free.Free where
-    ffmap = Free.hoistFree
+instance FFunctor NonTrans.Free where
+    ffmap = NonTrans.hoistFree
 
 instance FFunctor IdentityT where
     ffmap fg = IdentityT . fg . runIdentityT
@@ -82,6 +90,13 @@ instance FFunctor (WriterT m) where
 
 instance FFunctor (StateT s) where
     ffmap fg = StateT . fmap fg . runStateT
+
+{-
+-- Ummmmmmm, (Functor f, Monad m) => Functor (FreeT f m)
+-- So no, this is doomed to fail
+instance Functor f => FFunctor (FreeT f m) where
+    ffmap = hoistFreeT_
+-}
 
 {-
 -- This is not possible: @ContT r m@ uses @m@ in both covariant
@@ -133,9 +148,9 @@ instance Monad f => FMonad (Compose f) where
     fpure = Compose . return
     fjoin = Compose . join . fmap getCompose . getCompose
 
-instance FMonad Free.Free where
-    fpure = Free.liftF
-    fjoin = Free.retract
+instance FMonad NonTrans.Free where
+    fpure = NonTrans.liftF
+    fjoin = NonTrans.retract
 
 instance FMonad IdentityT where
     fpure = IdentityT
@@ -220,15 +235,15 @@ instance Monoid s => FMonad (StateT s) where
   fpure fa = StateT $ \_ -> (,mempty) <$> fa
   
   fjoin = StateT . fjoin_ . fmap runStateT . runStateT
+    where
+      fjoin_ :: forall f a. (Functor f) => (s -> s -> f ((a, s), s)) -> s -> f (a, s)
+      fjoin_ = fmap (fmap joinWriter) . joinReader
+        where
+          joinReader :: forall x. (s -> s -> x) -> s -> x
+          joinReader = join
 
-fjoin_ :: forall s f a. (Monoid s, Functor f) => (s -> s -> f ((a, s), s)) -> s -> f (a, s)
-fjoin_ = fmap (fmap joinWriter) . joinReader
-  where
-    joinReader :: forall x. (s -> s -> x) -> s -> x
-    joinReader = join
-    
-    joinWriter :: forall x. ((x,s),s) -> (x,s)
-    joinWriter ((a,s1),s2) = (a, s2 <> s1)
+          joinWriter :: forall x. ((x,s),s) -> (x,s)
+          joinWriter ((a,s1),s2) = (a, s2 <> s1)
 
 {-
 
@@ -353,3 +368,66 @@ instance (Applicative f) => FMonad (Day f) where
        (ffirstDay appendDay :: Day (Day f f) g ~> Day f g) .
        (assoc               :: Day f (Day f g) ~> Day (Day f f) g)
     -}
+
+{-----------------------------------------------------
+ =
+ =                  FreeT zone!
+ =
+------------------------------------------------------}
+
+-- | FreeT' is argument-flipped 'FreeT'
+newtype FreeT' m f b = FreeT' { unFreeT' :: FreeT f m b }
+    deriving (Applicative, Monad) via (FreeT f m)
+
+-- Sadly, Functor (FreeT m f) uses liftM instead of fmap,
+-- meaning (Monad m, Functor f) => Functor (FreeT f m).
+-- Maybe that was for backward compatibility,
+-- but I want (Functor m, Functor f) => ...
+fmapFreeT_ :: (Functor f, Functor m) => (a -> b) -> FreeT f m a -> FreeT f m b
+fmapFreeT_ f = let go = FreeT . fmap (bimap f go) . runFreeT in go
+
+ffmapFreeF :: forall f g a. (f ~> g) -> FreeF f a ~> FreeF g a
+ffmapFreeF _  (Pure a)  = Pure a
+ffmapFreeF fg (Free fb) = Free (fg fb)
+
+-- Same!
+transFreeT_, firstFreeT :: forall f g m. (Functor g, Functor m) => (f ~> g) -> FreeT f m ~> FreeT g m
+transFreeT_ fg =
+  let go = FreeT . fmap (fmap go . ffmapFreeF fg) . runFreeT in go
+firstFreeT = transFreeT_
+
+-- And!
+hoistFreeT_, secondFreeT :: forall f m n. (Functor f, Functor n) => (m ~> n) -> FreeT f m ~> FreeT f n
+hoistFreeT_ fg = let go = FreeT . fmap (fmap go) . fg . runFreeT in go
+secondFreeT = hoistFreeT_
+
+instance (Functor m, Functor f) => Functor (FreeT' m f) where
+    fmap f (FreeT' mx) = FreeT' (fmapFreeT_ f mx)
+
+instance Functor m => FFunctor (FreeT' m) where
+    ffmap f = FreeT' . transFreeT_ f . unFreeT'
+
+inr :: Functor m => m ~> FreeT f m
+inr = FreeT . fmap Pure
+
+inl :: (Functor f, Monad m) => f ~> FreeT f m
+inl = FreeT . return . Free . fmap return
+
+eitherFreeT :: Monad n => (f ~> n) -> (m ~> n) -> (FreeT f m ~> n)
+eitherFreeT nt1 nt2 = go
+  where
+    go ma =
+      do v <- nt2 (runFreeT ma)
+         case v of
+           Pure a  -> return a
+           Free fm -> nt1 fm >>= go
+
+instance Monad m => FMonad (FreeT' m) where
+    fpure :: forall g. Functor g => g ~> FreeT' m g
+    fpure = FreeT' . inl
+    
+    fjoin :: forall g. Functor g => FreeT' m (FreeT' m g) ~> FreeT' m g
+    fjoin = FreeT' . fjoin_ . transFreeT_ unFreeT' . unFreeT'
+      where
+        fjoin_ :: FreeT (FreeT g m) m ~> FreeT g m
+        fjoin_ = eitherFreeT id inr

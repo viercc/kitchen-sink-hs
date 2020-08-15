@@ -27,46 +27,6 @@ import FMonad
 type    ListT :: (Type -> Type) -> (Type -> Type)
 newtype ListT m a = ListT { runListT :: FreeT ((,) a) m () }
 
--- FreeT' is (Flip FreeT)
-newtype FreeT' m f b = FreeT' { unFreeT' :: FreeT f m b }
-    deriving (Applicative, Monad) via (FreeT f m)
-
--- Sadly, Functor (FreeT m f) uses liftM instead of fmap,
--- meaning (Monad m, Functor f) => Functor (FreeT f m).
--- Maybe that was for backward compatibility,
--- but I want (Functor m, Functor f) => ...
-fmapFreeT_ :: (Functor f, Functor m) => (a -> b) -> FreeT f m a -> FreeT f m b
-fmapFreeT_ f = let go = FreeT . fmap (bimap f go) . runFreeT in go
-
--- Same!
-transFreeT_ :: forall f g m. (Functor f, Functor m) => (f ~> g) -> FreeT f m ~> FreeT g m
-transFreeT_ fg =
-  let fg' :: forall a. FreeF f a ~> FreeF g a
-      fg' (Pure a) = Pure a
-      fg' (Free fr) = Free (fg fr)
-
-      go :: FreeT f m ~> FreeT g m
-      go (FreeT mfx) = FreeT $ fmap (fg' . fmap go) mfx
-  in go
-
-instance (Functor m, Functor f) => Functor (FreeT' m f) where
-    fmap f (FreeT' mx) = FreeT' (fmapFreeT_ f mx)
-
-instance Functor m => FFunctor (FreeT' m) where
-    ffmap f = FreeT' . transFreeT_ f . unFreeT'
-
-instance Monad m => FMonad (FreeT' m) where
-    fpure :: forall g. Functor g => g ~> FreeT' m g
-    fpure gx = FreeT' (liftF gx)
-    
-    fjoin :: forall g. Functor g => FreeT' m (FreeT' m g) ~> FreeT' m g
-    fjoin =  FreeT' . fjoin_ . transFreeT_ unFreeT' . unFreeT'
-      where
-        fjoin_ :: FreeT (FreeT g m) m ~> FreeT g m
-        fjoin_ = retractT
-
-
-
 newtype FMonadList mm a = FMonadList { runFMonadList :: mm ((,) a) () }
 
 instance (FFunctor mm) => Functor (FMonadList mm) where
@@ -89,8 +49,6 @@ instance (FMonad mm) => Monad (FMonadList mm) where
 {-
 
 Is it really lawful?
-
-(I'll skip `FreeT' m` being lawful `FMonad` part)
 
 Preparation:
 
