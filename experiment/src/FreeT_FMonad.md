@@ -445,3 +445,66 @@ fjoin_ . fjoin_
  = eitherFreeT id inr . transFreeT_ (eitherFreeT id inr)
  = fjoin_ . ffmap_ fjoin_
 ```
+
+## Note
+
+`inl, inr, eitherFreeT` looks like `Left, Right, either`.
+So it is tempting to say `FreeT (FreeT f n)` and `FreeT f (FreeT n m)`
+are isomophic by the following way:
+
+```haskell
+assoc :: FreeT f (FreeT n m) ~> FreeT (FreeT f n) m 
+assoc = eitherFreeT (inl . inl) (eitherFreeT (inl . inr) inr)
+
+disassoc :: FreeT (FreeT f n) m ~> FreeT f (FreeT n m)
+disassoc = eitherFreeT (eitherFreeT inl (inr . inl)) (inr . inr)
+```
+
+But this is not the case! In the `disassoc` function,
+it uses `inr . inl` as a monad morphism.
+While `inr . inl :: n ~> FreeT f (FreeT n m)` is a natural transformation
+between `Monad`s, it is not a monad morphism.
+
+By this lack of condition, you can't prove `disassoc . assoc = id`.
+You shouldn't be able to ---- because they are *not* isomorphism.
+
+`FreeT t u` has the following "nesting structure" of functors t,u:
+
+```
+FreeT t u ~ u ∘ t ∘ u ∘ t ∘ ･･･ ∘ t ∘ u
+
+(1u = u made by applying `return @u`)
+inl t = 1u ∘ t ∘ 1u
+inr u = u
+```
+
+So nesting of `FreeT (FreeT f n) m` is, for example,
+
+```
+  m ∘ FreeT f n         ∘ m ∘ FreeT f n             ∘ m
+= m ∘ (n ∘ f ∘ ･･･ ∘ n) ∘ m ∘ (n ∘ f ∘ n ∘ ･･･ ∘ n) ∘ m
+```
+
+And for `FreeT f (FreeT n m)`:
+
+```
+  FreeT n m             ∘ f ∘  FreeT n m            ∘ f ∘ FreeT n m
+= (m ∘ n ∘ m ∘ ･･･ ∘ m) ∘ f ∘ (m ∘ n ∘ m ∘ ･･･ ∘ m) ∘ f ∘ (m ∘ n ∘ m ∘ ･･･ ∘ m)
+```
+
+Using this notation, a counterexample for they are not inverses look like this:
+
+```
+      (:: FreeT (FreeT f n) m)
+  m ∘ FreeT f n   ∘ m
+= m ∘ (n ∘ f ∘ n) ∘ m
+   || (disassoc)
+   vv
+  m ∘ (1m ∘ n ∘ 1m) ∘ (1m ∘ f ∘ 1m) ∘ (1m ∘ n ∘ 1m) ∘ m
+=  m ∘ n ∘ 1m  ∘ f ∘  1m ∘ n ∘ m
+= (m ∘ n ∘ 1m) ∘ f ∘ (1m ∘ n ∘ m)
+   || (assoc)
+   vv
+  m ∘ (1m ∘ n ∘ 1m) ∘ 1m ∘ (1m ∘ 1n ∘ f ∘ 1n ∘ 1m) ∘ 1m ∘ (1m ∘ n ∘ 1m) ∘ m
+= m ∘ (n) ∘ 1m ∘ (1n ∘ f ∘ 1n) ∘ 1m ∘ (n) ∘ m
+```
