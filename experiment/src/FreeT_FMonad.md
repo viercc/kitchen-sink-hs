@@ -449,7 +449,7 @@ fjoin_ . fjoin_
 ## Note
 
 `inl, inr, eitherFreeT` looks like `Left, Right, either`.
-So it is tempting to say `FreeT (FreeT f n)` and `FreeT f (FreeT n m)`
+So it is tempting to say `FreeT (FreeT f n) m` and `FreeT f (FreeT n m)`
 are isomophic by the following way:
 
 ```haskell
