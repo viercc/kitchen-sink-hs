@@ -151,7 +151,7 @@ eitherFreeT nt1 nt2 = go
            Free fm -> nt1 fm >>= go
 ```
 
-**(1)** It is actually a monad morphism.
+**(1)** It is actually a monad morphism
 
 `go . return = return` is straightforward.
 
@@ -224,7 +224,7 @@ go $ join mma
          Free fm -> nt1 fm >>= go . join
 ```
 
-**(2)** Composing with injections gets original arrows back.
+**(2)** Composing with injections gets original arrows back
 
 ```haskell
 go $ inl fa
@@ -255,12 +255,11 @@ go $ inr ma
  = nt2 ma
 ```
 
-**(3)** Such monad morphism is unique.
+**(3)** `eitherFreeT` has "naturality"
 
-Suppose `nt' :: FreeT f m ~> n` is a monad morphism with a property
-`nt' . inl = nt1` and `nt' . inr = nt2`. It can be shown that `nt' = eitherFreeT nt1 nt2`.
-
-*Lemma 3-1.* For all monad morphism `after :: n ~> n'`, `after . eitherFreeT nt1 nt2 = eitherFreeT (after . nt1) (after . nt2)`.
+`eitherFreeT` has "naturality" in the following sense: for all `nt1 :: f ~> n, nt2 :: m ~> n`
+and `after :: n ~> n'` where `nt2` and `after` are monad morphisms,
+`after . eitherFreeT nt1 nt2 = eitherFreeT (after . nt1) (after . nt2)`.
 
 ```haskell
 go = eitherFreeT nt1 nt2
@@ -289,7 +288,12 @@ go' ma
 
 `after . go` and `go'` are equal by induction.
 
-*Lemma 3-2.* `eitherFreeT inl inr = id`
+**(4)** Such monad morphism is unique
+
+Suppose `nt' :: FreeT f m ~> n` is a monad morphism with a property
+`nt' . inl = nt1` and `nt' . inr = nt2`. It can be shown that `nt' = eitherFreeT nt1 nt2`.
+
+*Lemma 4-1.* `eitherFreeT inl inr = id`
 
 ```haskell
 go = eitherFreeT inl inr
@@ -343,7 +347,7 @@ go ma
  = ma
 ```
 
-By lemma *3-1* and *3-2*, 
+By naturality and Lemma 4-1, 
 
 ```haskell
 eitherFreeT nt1 nt2
@@ -356,8 +360,8 @@ Thus there are only one monad morphism with these properties.
 
 ### Corollary of the universal property
 
-`transFreeT_` maps "right" component of `FreeT f m`, and commutes with `eitherFreeT`
-in very expected way.
+`transFreeT_` maps "left" component of `FreeT f m`,
+and commutes with `eitherFreeT` in very expected way.
 
 ```haskell
 transFreeT_ f . inr
@@ -371,13 +375,15 @@ transFreeT_ f . inl
  = FreeT . return . Free . fmap return . f
  = inl . f
 
+-- By uniqueness of the morphism:
 transFreeT_ f = eitherFreeT (inl . f) inr
 
+-- Combining the above with naturality:
 eitherFreeT nt1 nt2 . transFreeT_ f
  = eitherFreeT (eitherFreeT nt1 nt2 . transFreeT_ f . inl)
                (eitherFreeT nt1 nt2 . transFreeT_ f . inr)
  = eitherFreeT (eitherFreeT nt1 nt2 . inl . f) (eitherFreeT nt1 nt2 . inr)
- = eitherFreeT (nt1 . f) (nt2) 
+ = eitherFreeT (nt1 . f) (nt2)
 ```
 
 ### `FMonad` laws
