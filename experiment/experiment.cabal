@@ -16,22 +16,30 @@ library
                    GenericN, HMatchable, Heap, LCS, LatticeLike, ListT,
                    LogRwd, Matrix, MatrixCatamorphism,
                    Ordinal, Polynomial, Readerize,
-                   Selective, Selective2, TreesThatGrow,
+                   PrismSelective, Selective2, TreesThatGrow,
                    ListTVia, FMonadExamples, FMonad
   build-depends:       base >= 4.10 && < 5
+                     , ghc-prim
+                     , reflection
+                     
+                     , containers
+                     , data-ordlist
+                     -- , vector
+
+                     , lens
+                     , selective
+                     , semialign
+                     , these
+                     
                      , transformers
                      , mtl
                      , free
-                     , data-ordlist
-                     , ghc-prim
-                     , containers
-                     , vector
-                     , reflection
-                     , these
-                     , semialign
+                     
                      , QuickCheck
+                     
                      , autolift
-  ghc-options:         -Wall -Wcompat -Wunused-packages
+  ghc-options:       -Wall -Wcompat -Werror
+                     -Wunused-packages -Wwarn=unused-packages
 
 executable experiment-configured
   build-depends:       base, experiment
