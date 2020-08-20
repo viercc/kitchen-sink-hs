@@ -39,7 +39,7 @@ test2 = Branch Fail (Branch (Success 1) (Success 2))
 
 {- Solves puzzle:
  A gold coin worth 3 silver coins,
-a platinum coin worth 7 gold coins,
+a platinum coin worth 7 silver coins,
 and a diamond gem worth 19 silver coins.
 
 How can you pay for 100 silver coin worthy item
