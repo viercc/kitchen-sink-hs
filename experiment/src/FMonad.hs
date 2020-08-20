@@ -94,7 +94,7 @@ instance FFunctor (StateT s) where
 {-
 -- Ummmmmmm, (Functor f, Monad m) => Functor (FreeT f m)
 -- So no, this is doomed to fail
-instance Functor f => FFunctor (FreeT f m) where
+instance Functor f => FFunctor (FreeT f) where
     ffmap = hoistFreeT_
 -}
 
