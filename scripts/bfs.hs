@@ -8,34 +8,32 @@ module Main where
 import Control.Applicative
 import Control.Monad
 
-data Tree a = Fail | Success a | Branch (Tree a) (Tree a)
+data Tree a = Leaf a | Branch [Tree a]
   deriving (Show, Eq, Functor)
 
 instance Applicative Tree where
-  pure = Success
+  pure = Leaf
   (<*>) = ap
 
 instance Alternative Tree where
-  empty = Fail
-  (<|>) = Branch
+  empty = Branch []
+  x <|> y = Branch [x,y]
 
 instance Monad Tree where
   return = pure
   
-  Fail       >>= _ = Fail
-  Success a  >>= k = k a
-  Branch x y >>= k = Branch (x >>= k) (y >>= k)
+  Leaf a    >>= k = k a
+  Branch xs >>= k = Branch (map (>>= k) xs)
 
 instance MonadPlus Tree where
   mzero = empty
   mplus = (<|>)
 
-
 test1 :: Tree Int
-test1 = Branch Fail Fail
+test1 = empty <|> empty
 
 test2 :: Tree Int
-test2 = Branch Fail (Branch (Success 1) (Success 2))
+test2 = empty <|> (pure 1 <|> pure 2)
 
 {- Solves puzzle:
  A gold coin worth 3 silver coins,
@@ -48,20 +46,20 @@ using no silver coins?
 test3 :: Tree [Int]
 test3 = go [] 100
   where
-    coins = pure 3 <|> (pure 7 <|> pure 19)
+    coins = Branch $ return <$> [3,7,19]
     go xs n
-      | n == 0    = Success xs
-      | n < 0     = Fail
+      | n == 0    = return xs
+      | n < 0     = mzero
       | otherwise = coins >>= \x -> go (x:xs) (n-x)
 
 test4 :: Tree [Int]
 test4 = go [] 100
   where
-    coins = pure 3 <|> (pure 7 <|> pure 19)
+    coins = Branch $ return <$> [3,7,19]
     go xs n
-      | n == 0    = Success xs
+      | n == 0    = return xs
       {- Oops, didn't check negatives. It will make infinite trees!
-      | n < 0     = Fail
+      | n < 0     = mzero
       -}
       | otherwise = coins >>= \x -> go (x:xs) (n-x)
 
@@ -98,16 +96,25 @@ fromLazy (Final a) = Just a
 fromLazy (Next x)  = fromLazy x
 
 treeToLazy :: Tree a -> Lazy a
-treeToLazy Fail         = Dead
-treeToLazy (Success a)  = Final a
-treeToLazy (Branch x y) = Next $ treeToLazy x <|> treeToLazy y
+treeToLazy (Leaf a)    = Final a
+treeToLazy (Branch xs) =
+  Next $ tfold Dead (<|>) $ (treeToLazy <$> xs)
+
+tfold :: a -> (a -> a -> a) -> [a] -> a
+tfold zero op = go
+  where
+    go []  = zero
+    go [a] = a
+    go as  = go (pairs as)
+
+    pairs (a : b : rest) = op a b : pairs rest
+    pairs as = as
 
 ---------------------------------------------------------
 
 dfs :: Tree a -> Maybe a
-dfs Fail         = empty
-dfs (Success a)  = pure a
-dfs (Branch x y) = dfs x <|> dfs y
+dfs (Leaf a)    = pure a
+dfs (Branch xs) = foldr (<|>) Nothing $ dfs <$> xs
 
 bfs :: Tree a -> Maybe a
 bfs = fromLazy . treeToLazy
