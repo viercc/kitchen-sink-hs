@@ -57,3 +57,4 @@ executable monad-builder-test
                , monads-collection
   default-language: Haskell2010
   ghc-options:      -rtsopts -with-rtsopts=-M50m
+  
