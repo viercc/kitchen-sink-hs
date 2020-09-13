@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE GADTs          #-}
 {-# LANGUAGE PolyKinds      #-}
 {-# LANGUAGE RankNTypes     #-}
@@ -6,18 +6,23 @@
 {-# LANGUAGE FlexibleInstances  #-}
 module HMatchable where
 
+import Data.Kind (Type, Constraint)
+
 import Data.Functor.Const
 import Data.Functor.Product
 
 import Data.Type.Equality
 
-class HFunctor (t :: (k -> *) -> k -> *) where
+type  HFunctor :: ((k -> Type) -> k -> Type) -> Constraint
+class HFunctor t where
   hfmap :: (forall xx. f xx -> g xx) -> t f yy -> t g yy
 
-class HFoldable (t :: (k -> *) -> k -> *) where
+type  HFoldable :: ((k -> Type) -> k -> Type) -> Constraint
+class HFoldable t where
   hfoldMap :: (Monoid r) => (forall xx. f xx -> r) -> t f a -> r
 
-class (HFunctor t) => HMatchable (t :: (k -> *) -> k -> *) where
+type  HMatchable :: ((k -> Type) -> k -> Type) -> Constraint
+class (HFunctor t) => HMatchable t where
   hzipMatch :: t f xx -> t g xx -> Maybe (t (Product f g) xx)
   hzipMatch = hzipMatchWith (\fx gx -> Just (Pair fx gx))
   
@@ -25,13 +30,13 @@ class (HFunctor t) => HMatchable (t :: (k -> *) -> k -> *) where
                    t f yy -> t g yy -> Maybe (t h yy)
 
 {-
-data Universe (a :: *) where
+data Universe a where
   Lit :: a -> Universe a
   Nil :: Universe [a]
   Cons :: Universe a -> Universe [a] -> Universe [a]
 -}
 
-data UniverseF (f :: (* -> *)) (a :: *)  where
+data UniverseF f a where
   LitF :: Int -> UniverseF f Int
   NilF :: UniverseF f [a]
   ConsF :: f a -> f [a] -> UniverseF f [a]
@@ -58,11 +63,11 @@ instance HFoldable UniverseF where
     ConsF fa fas -> f fa <> f fas
     PairF fa fb  -> f fa <> f fb
 
-newtype HFix (t :: (k -> *) -> (k -> *)) (a :: k) = HFix (t (HFix t) a)
+type HFix :: ((k -> Type) -> k -> Type) -> k -> Type
+newtype HFix t a = HFix (t (HFix t) a)
 
-data HFree (t :: (k -> *) -> (k -> *))
-           (f :: k -> *)
-           (a :: k)
+type HFree :: ((k -> Type) -> k -> Type) -> (k -> Type) -> k -> Type
+data HFree t f a
   = HPure (f a)
   | HFree (t (HFree t f) a)
 
@@ -83,7 +88,7 @@ instance (DShow tag, DShow f) => Show (DSum tag f) where
   showsPrec p (tagx :==>: fx) =
     showParen (p > 6) $ dshowsPrec 7 tagx . (" :==>: "++) . dshowsPrec 7 fx
 
-data UniverseTRep (a :: *) where
+data UniverseTRep a where
   IntT :: UniverseTRep Int
   ListT :: UniverseTRep a -> UniverseTRep [a]
   PairT :: UniverseTRep a -> UniverseTRep b -> UniverseTRep (a,b)

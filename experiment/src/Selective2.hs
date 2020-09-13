@@ -17,7 +17,6 @@ module Selective2 where
 import Prelude hiding ((.), id)
 import Control.Category
 import Control.Applicative(Applicative(..))
-import Data.Functor.Identity
 
 data a -? b = Const b | Fun (a -> b)
   deriving Functor

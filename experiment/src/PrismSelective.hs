@@ -3,9 +3,9 @@
 {-# LANGUAGE TypeOperators #-}
 module PrismSelective where
 
-import Data.Void
+import Data.Bifunctor
 import Control.Selective
-import Control.Lens.Prism
+import Control.Lens.Prism hiding (aside)
 
 swapE :: Either a b -> Either b a
 swapE = either Right Left

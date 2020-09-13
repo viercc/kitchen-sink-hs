@@ -6,6 +6,7 @@ module Distributive where
 
 import Data.Functor.Const
 import Unsafe.Coerce (unsafeCoerce)
+import Data.Kind (Type)
 
 ---- Example types that is Distributive
 newtype Id a = Id { runId :: a }
@@ -102,7 +103,7 @@ join (join ggga)
 
 ---- Representable Functor
 class Functor f => Representable f where
-  type Rep f :: *
+  type Rep f :: Type
   index :: f a -> Rep f -> a
   tabulate :: (Rep f -> a) -> f a
 

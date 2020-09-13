@@ -4,7 +4,9 @@ module Ordinal(
   Ordinal(),
   omega,
   OrdinalView(..),
-  view
+  view,
+
+  hardy, hardy_eps0
 ) where
 
 type Natural = Integer
@@ -93,9 +95,6 @@ instance Show OrdinalView where
     where s = show . f
 
 -- | Hardy hierarchy
-data Fn a =
-  Id | Add !a | Mult !a | Pow !a | Higher (a -> a)
-
 hardy :: Ordinal -> Integer -> Integer
 hardy x !n = case view x of
   Zero    -> n
@@ -107,24 +106,3 @@ hardy_eps0 n = hardy (nTimes n omega 0) n
   where
     nTimes 0 _ x = x
     nTimes m f x = f (nTimes (m-1) f x)
-
-hydraGame :: Ordinal -> [Ordinal]
-hydraGame = \x -> x : go 1 x
-  where
-    split (CNF []) = Nothing
-    split (CNF ((e,c):as))
-      | c <= 1    = Just (CNF [], e, CNF as)
-      | otherwise = Just (CNF [(e,c-1)], e, CNF as)
-    step n x =
-      case split x of
-        Nothing -> Nothing
-        Just (x1, e, x2) ->
-          case split e of
-            Nothing -> Just $ x1 + x2
-            Just (y1, CNF [], y2) -> Just $ x1 + CNF [(y1+y2,n)] + x2
-            _ -> case step n e of
-                   Nothing -> error "Must not happen!"
-                   Just e' -> Just $ x1 + omega e' + x2
-    go !n x = case step n x of
-      Nothing -> []
-      Just x' -> x' : go (n+1) x'

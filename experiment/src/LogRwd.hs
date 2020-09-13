@@ -4,12 +4,7 @@ module LogRwd where
 import Prelude hiding (log)
 import Data.Bifunctor
 
-import Data.Coerce
-
-
 import Control.Monad.State
-
-import Control.Monad.Identity
 
 {-
 module LogRwdTransf(M : MONAD) = struct

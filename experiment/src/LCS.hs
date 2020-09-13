@@ -11,7 +11,7 @@ module LCS(
 import qualified Data.Map.Lazy as Map
 import Data.Map.Lazy (Map)
 
-import Data.List (foldl', foldl1', maximum)
+import Data.List (foldl', foldl1')
 import Data.Maybe (fromMaybe)
 
 -- | Prefix tree

@@ -19,6 +19,7 @@ import qualified Data.Maybe
 import           Data.Void
 import qualified Data.Align
 import           Data.These
+import Data.Kind (Type)
 
 newtype Partial a b = Partial (a -> Maybe b)
 
@@ -31,8 +32,8 @@ type Hask = (->)
 ---- Functor ----
 
 class (Category (Dom f), Category (Cod f)) => Functor (f :: j -> k) where
-    type Dom f :: j -> j -> *
-    type Cod f :: k -> k -> *
+    type Dom f :: j -> j -> Type
+    type Cod f :: k -> k -> Type
 
     map :: Dom f x y -> Cod f (f x) (f y)
 
@@ -61,7 +62,7 @@ instance (Ord k) => Functor (Map k) where
 
 ---- CartesianProduct ----
 
-class Category cat => CartesianProduct (cat :: k -> k -> *) where
+class Category cat => CartesianProduct (cat :: k -> k -> Type) where
     type CP cat :: k -> k -> k
     type Terminal cat :: k
 

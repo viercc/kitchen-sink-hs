@@ -1,3 +1,4 @@
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
@@ -8,10 +9,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Polynomial where
 
+import Data.Kind (Type)
 import Data.Void
-import Data.Proxy
-import Data.Reflection
-
 import GHC.Generics
 
 data Poly tag x where
@@ -20,7 +19,7 @@ data Poly tag x where
 deriving instance Functor (Poly tag)
 
 class Polynomial f where
-  type family Tag f :: * -> *
+  type family Tag f :: Type -> Type
 
   toPoly :: f x -> Poly (Tag f) x
   fromPoly :: Poly (Tag f) x -> f x
@@ -35,10 +34,13 @@ instance Polynomial ((->) r) where
   toPoly f = P TagA f
   fromPoly (P TagA f) = f
 
+absurdV1 :: V1 a -> any
+absurdV1 v1 = case v1 of
 
 instance Polynomial V1 where
   type Tag V1 = V1
-
+  toPoly = absurdV1
+  fromPoly (P tag _)= absurdV1 tag
 
 data TagK c x where
   TagK :: c -> TagK c Void

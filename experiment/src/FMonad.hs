@@ -24,6 +24,9 @@ module FMonad(
 
   FlipCompose(..),
   Day(..),
+  ffirstDay, fsecondDay,
+  intro1, elim1, assoc, disassoc,
+  pureId, appendDay,
   
   FreeT'(..),
 

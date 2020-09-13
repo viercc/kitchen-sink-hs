@@ -1,7 +1,7 @@
 module AdditionChain where
 
 import Data.Ord (comparing)
-import Data.List (sortBy, minimumBy)
+import Data.List (sortBy)
 import Data.Bits
 
 import           Data.IntMap (IntMap)

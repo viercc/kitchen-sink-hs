@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
@@ -13,28 +14,31 @@ module MatrixCatamorphism(
 
 import           Matrix
 
-import           GHC.TypeLits
+import Data.Kind(Type)
+import GHC.TypeLits ( KnownNat, Nat )
 
--- Arrows of categories of (Nat -> Nat -> *)
-type (f :: Nat -> Nat -> *) ~> (g :: Nat -> Nat -> *) =
+type Mat = Nat -> Nat -> Type
+
+type (f :: Mat) ~> (g :: Mat) =
   forall m n. (KnownNat m, KnownNat n) => f m n -> g m n
 
--- Endofunctor on (Nat -> Nat -> *)
-class Functor' (f :: (Nat -> Nat -> *) -> Nat -> Nat -> *) where
-    fmap' :: (a ~> b) -> (f a ~> f b)
+class Functor' (f :: Mat -> Mat) where
+  fmap' :: (a ~> b) -> (f a ~> f b)
 
 -- Algebra is arrow f a to a
 type Algebra' f a = f a ~> a
 
 -- Fixpoint of endofunctor on (Nat -> Nat -> *)
-newtype Fix' (f :: (Nat -> Nat -> *) -> Nat -> Nat -> *) (m :: Nat) (n :: Nat) =
-    Fix' { unFix' :: f (Fix' f) m n }
+type    Fix' :: (Mat -> Mat) -> Mat
+newtype Fix' f m n =
+  Fix' { unFix' :: f (Fix' f) m n }
 
 -- Catamorphism
 cata' :: (Functor' f) => Algebra' f a -> (Fix' f ~> a)
 cata' phi = phi . fmap' (cata' phi) . unFix'
 
-data MatExprF (k :: *) (r :: Nat -> Nat -> *) (m :: Nat) (n :: Nat) where
+type MatExprF :: Type -> Mat -> Mat
+data MatExprF k (r :: Mat) m n where
     Zero :: MatExprF k r m n
     Dense :: Matrix m n k -> MatExprF k r m n
     Add :: r m n -> r m n -> MatExprF k r m n

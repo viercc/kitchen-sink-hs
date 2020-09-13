@@ -13,11 +13,12 @@ library
   hs-source-dirs:  src
   exposed-modules: AdHocInstances, AdditionChain, Cardinality,
                    Cats, CheapRecord, ContEq2, Distributive, Dsl,
-                   GenericN, HMatchable, Heap, LCS, LatticeLike, ListT,
+                   HMatchable, Heap, LCS, LatticeLike, ListT,
                    LogRwd, Matrix, MatrixCatamorphism,
                    Ordinal, Polynomial, Readerize,
                    PrismSelective, Selective2, TreesThatGrow,
-                   ListTVia, FMonadExamples, FMonad
+                   ListTVia, FMonadExamples, FMonad,
+                   Poifree
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
@@ -34,15 +35,15 @@ library
                      , transformers
                      , mtl
                      , free
+                     , comonad
                      
                      , QuickCheck
                      
                      , autolift
-  ghc-options:       -Wall -Wcompat -Werror
+  ghc-options:       -Wall -Wcompat
                      -Wunused-packages -Wwarn=unused-packages
 
 executable experiment-configured
   build-depends:       base, experiment
   default-language:    Haskell2010
   main-is: ok.hs
-

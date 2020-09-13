@@ -96,15 +96,28 @@ adhocGroup unit append inv' expr =
 
 --------------------------------------
 
-example1 :: Int
-example1 = adhocGroup 0 (+) negate $
-  inj 1 <> inv (inj 2) <> mempty
+{- |
 
-example2 :: Rational -> Rational
-example2 x = adhocGroup 1 (*) recip $
-  inj x <> inv (inj x <> inj 2)
+>>> :{
+    example1 :: Int
+    example1 = adhocGroup 0 (+) negate $
+      inj 1 <> inv (inj 2) <> mempty
 
-example3 :: Bool -> Bool -> Bool
-example3 x y = adhocGroup False xor id $
-  inj x <> inv (inj y) <> inv (inj x)
-  where xor = (/=)
+    example2 :: Rational -> Rational
+    example2 x = adhocGroup 1 (*) recip $
+      inj x <> inv (inj x <> inj 2)
+
+    example3 :: Bool -> Bool -> Bool
+    example3 x y = adhocGroup False xor id $
+      inj x <> inv (inj y) <> inv (inj x)
+      where xor = (/=)
+    :}
+
+>>> example1
+-1
+>>> example2 <$> [1, 1/2, 1/3]
+[2,2,2]
+>>> example3 True False
+False
+
+-}

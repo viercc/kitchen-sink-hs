@@ -13,6 +13,7 @@
 module TreesThatGrow where
 
 import qualified Data.Set as Set
+import Data.Kind (Type)
 
 -- Let's define a type for syntax tree
 
@@ -49,11 +50,11 @@ data Stage2 (tag :: NodeType) where
 
 -- I use two type classes to reduce the verbosity
 
-class Member (stage :: k -> *) (tag :: k) where
+class Member (stage :: k -> Type) (tag :: k) where
   -- | 'auto' indicates the type @stage tag@ is inhabited
   auto :: stage tag
 
-class NotMember (stage :: k -> *) (tag :: k) where
+class NotMember (stage :: k -> Type) (tag :: k) where
   -- | 'autoNot' indicates there can not be a value for the type @stage tag@
   autoNot :: stage tag -> any
 
