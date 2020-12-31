@@ -1,0 +1,33 @@
+cabal-version: 2.2
+name: perf-issquare
+version: 0
+
+flag use-integer
+  default: False
+
+common a
+  hs-source-dirs: src
+  other-modules:  Runner
+  build-depends:  base >= 4.10
+  default-language: Haskell2010
+  ghc-options: -ddump-to-file -ddump-rule-rewrites
+               -rtsopts
+  
+  if flag(use-integer)
+    cpp-options: -DINT_TYPE=Integer
+
+executable bss
+  import: a
+  main-is: bss.hs
+
+executable bss-poly
+  import: a
+  main-is: bss-poly.hs
+
+executable iamemhn
+  import: a
+  main-is: iamemhn.hs
+
+executable opt
+  import: a
+  main-is: opt.hs
