@@ -18,14 +18,14 @@ library
                    Ordinal, Polynomial, Readerize,
                    PrismSelective, Selective2, TreesThatGrow,
                    ListTVia, FMonadExamples, FMonad,
-                   Poifree
+                   Poifree, PartialMonad
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
                      
                      , containers
                      , data-ordlist
-                     -- , vector
+                     , vector
 
                      , lens
                      , selective
