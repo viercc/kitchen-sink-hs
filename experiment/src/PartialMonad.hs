@@ -74,9 +74,3 @@ para pf pg = arr fromE . (pf +++ pg) . arr toE
 
 instance (Traversable f, PFunctor g) => PFunctor (f :+: g) where
   pmap f = (Partial . traverse . runPartial $ f) `para` pmap f
-
-instance (Traversable f, PMonad g) => PMonad (f :+: g) where
-  ppure = arr R1 . ppure
-  pjoin = Partial pjoin_
-    where
-      pjoin_ (L1 ga)
