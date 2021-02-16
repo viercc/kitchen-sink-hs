@@ -1,0 +1,7 @@
+resolver: lts-17.4
+
+packages:
+- .
+
+allow-newer: true
+system-ghc: true
