@@ -1,0 +1,18 @@
+cabal-version:  3.0
+version:        0.1
+name:           exetest
+build-type:     Simple
+
+executable subject
+    hs-source-dirs:     .
+    main-is:            Main.hs
+    build-depends:      base
+    default-language:   Haskell2010
+
+test-suite tester
+    type:               exitcode-stdio-1.0
+    hs-source-dirs:     .
+    main-is:            Test.hs
+    build-depends:      base, process
+    build-tool-depends: exetest:subject
+    default-language:   Haskell2010
