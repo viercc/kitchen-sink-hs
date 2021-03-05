@@ -1,69 +1,65 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia #-}
 module HeytingApplicative where
 
 import Data.Word (Word8)
-import qualified Data.Set as Set
+import Lattice
+import Data.Function (on)
+import Control.Applicative
+import Data.Bool (bool)
+import Control.Monad (guard)
 
--- | Mystery applicative
-newtype H a = H (Bool, Bool -> a)
-  deriving Functor
-
-instance Applicative H where
-  pure a = H (True, const a)
-  H (x, f) <*> H (y, g) = H (x && y, fg)
-    where fg t = f (t && (x ===> y)) (g (t && x))
-
--- | "x implies y" operator
-(===>) :: Bool -> Bool -> Bool
-x ===> y = not x || y
-
--- | Heyting algebra-based applicative: linear order edition
-newtype Hord x a = Hord (x, x -> a)
+data F x a = F x (x -> a)
   deriving (Functor)
 
-instance (Ord x, Bounded x) => Applicative (Hord x) where
-  pure a = Hord (maxBound, const a)
-  Hord (x, f) <*> Hord (y, g) = Hord (min x y, fg)
-    where x_to_y | x <= y    = maxBound
-                 | otherwise = y
-          fg t = f (min t x_to_y) (g (min t x))
-
-testHord :: Hord Word8 [Word8]
-testHord = sequenceA [ Hord (n, id) | n <- ns ]
-  where ns = [1,2,1,3,1,4,1,5,1,6,1,7]
-
--- | Heyting algebra of cofinite sets
-data Cofin u = Empty | NotIn !(Set.Set u)
-  deriving (Eq, Show)
-
-member :: Ord u => u -> Cofin u -> Bool
-member _ Empty = False
-member u (NotIn s) = u `Set.notMember` s
-
--- forall a. a `member` full
-full :: Cofin u
-full = NotIn Set.empty
-
--- forall a x y.
---   a `member` intersection x y == (a `member` x && a `member` y) 
-intersection :: Ord u => Cofin u -> Cofin u -> Cofin u
-intersection (NotIn s) (NotIn t) = NotIn (Set.union s t)
-intersection _ _ = Empty
-
--- forall a x y.
---   a `member` impCofin x y == (a `member` x ===> a `member` y) 
-impCofin :: Ord u => Cofin u -> Cofin u -> Cofin u
-impCofin Empty _ = full
-impCofin _ Empty = Empty
-impCofin (NotIn s) (NotIn t) = NotIn (t Set.\\ s)
-
--- | Heyting algebra-based applicative: cofinite set edition
-newtype HCofin u a = HCofin (Cofin u, Cofin u -> a)
-  deriving Functor
-
-instance Ord u => Applicative (HCofin u) where
-  pure a = HCofin (full, const a)
-  HCofin (x,f) <*> HCofin (y,g) = HCofin (intersection x y, fg)
+instance Heyting x => Applicative (F x) where
+  pure a = F top (const a)
+  F x f <*> F y g = F (x /\ y) fg
     where
-      fg t = f (t `intersection` (x `impCofin` y)) (g (t `intersection` x))
+      fg t = f (t /\ (x `imp` y)) $ g (x `imp` t)
 
+data B = O | I
+  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+
+type FBB = F Bool [B]
+fbs :: [FBB]
+fbs = [F True r, F False r]
+  where
+    r = pure . bool O I
+
+fbrep :: F Bool c -> (Bool, c, c)
+fbrep (F x f) = (x, f True, f False)
+
+fbeq :: (Eq a) => F Bool a -> F Bool a -> Bool
+fbeq = (==) `on` fbrep
+
+(<++>) :: Applicative f => f [a] -> f [a] -> f [a]
+(<++>) = liftA2 (++)
+
+propUnitL, propUnitR :: [FBB]
+propUnitL = [ x | x <- fbs, not $ (pure [] <++> x) `fbeq` x ]
+propUnitR = [ x | x <- fbs, not $ (x <++> pure []) `fbeq` x ]
+
+propAssoc :: [(FBB,FBB,FBB)]
+propAssoc = do
+  x <- fbs
+  y <- fbs
+  z <- fbs
+  guard $ not $ ((x <++> y) <++> z) `fbeq` (x <++> (y <++> z))
+  pure (x,y,z)
+
+testFord :: F (Ordered Word8) [Word8]
+testFord = traverse i [1,2,1,3,1,4,1,5,1,6,1,7]
+  where i n = F (Ordered n) getOrdered
+
+data H x a = H x (x -> a)
+  deriving (Functor)
+
+instance Heyting x => Applicative (H x) where
+  pure a = H top (const a)
+  H x f <*> H y g = H (x /\ y) fg
+    where fg t = f (t /\ (x `imp` y)) (g (t /\ x))
+
+testHord :: H (Ordered Word8) [Word8]
+testHord = traverse i [1,2,1,3,1,4,1,5,1,6,1,7]
+  where i n = H (Ordered n) getOrdered

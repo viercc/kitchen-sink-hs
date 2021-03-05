@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: "experiment/src"
+      component: "lib:experiment"
+    
+    - path: "autolift"
+      component: "lib:autolift"
+    
+    - path: "lattices/src"
+      component: "lib:lattices"

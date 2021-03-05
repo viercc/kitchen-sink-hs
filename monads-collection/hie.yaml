@@ -1,0 +1,13 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:monads-collection"
+
+    - path: "test"
+      component: "monads-collection:test:esoteric-test"
+
+    - path: "test/QueueTest.hs"
+      component: "monads-collection:exe:monad-queue-test"
+
+    - path: "test/BuilderTest.hs"
+      component: "monads-collection:exe:monad-builder-test"
