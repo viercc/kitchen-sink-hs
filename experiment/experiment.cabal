@@ -19,7 +19,7 @@ library
                    PrismSelective, Selective2, TreesThatGrow,
                    ListTVia, FMonadExamples, FMonad,
                    Poifree, PartialMonad,
-                   HeytingApplicative
+                   Newtypes, HeytingApplicative
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
