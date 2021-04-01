@@ -43,3 +43,4 @@ instance Integral Two where
   toInteger (Two b) = if b then 1 else 0
   quotRem _ 0 = error "division by zero"
   quotRem x _ = (x,0)
+
