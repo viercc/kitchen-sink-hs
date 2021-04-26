@@ -4,7 +4,6 @@ version: 0
 
 common a
   hs-source-dirs: src
-  other-modules: Common
   build-depends:  base >= 4.10, vector
   default-language: Haskell2010
   ghc-options: -rtsopts
