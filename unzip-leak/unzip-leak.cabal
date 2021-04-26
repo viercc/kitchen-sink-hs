@@ -1,0 +1,21 @@
+cabal-version: 2.2
+name: unzip-leak
+version: 0
+
+common a
+  hs-source-dirs: src
+  other-modules: Common
+  build-depends:  base >= 4.10, vector
+  default-language: Haskell2010
+  ghc-options: -rtsopts
+
+executable unzip-list
+  import: a
+  main-is: unzip-test.hs
+  cpp-options: -DUNZIP_FUNCTION=unzipList
+
+executable unzip-fmap
+  import: a
+  main-is: unzip-test.hs
+  cpp-options: -DUNZIP_FUNCTION=unzipFunctor
+
