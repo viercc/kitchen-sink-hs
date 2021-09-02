@@ -3,6 +3,9 @@ cradle:
     - path: "experiment/src"
       component: "lib:experiment"
     
+    - path: "punctors/src"
+      component: "lib:punctors"
+    
     - path: "autolift"
       component: "lib:autolift"
     
