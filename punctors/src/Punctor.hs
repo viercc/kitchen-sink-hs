@@ -57,34 +57,34 @@ class Punctor (f :: j -> k) where
     --
     --   > punmap :: Fn Type a b -> Fn Type (f a) (f b)
     --   > punmap :: (a -> b)    -> (f a -> f b)
+    --
+    --   It should satisfy the functor laws, given
+    --   each of @Fn j@ and @Fn k@ actually has a @Category@ instance.
+    --
+    --   > punmap id = id
+    --   > punmap (f . g) = punmap f . punmap g
     punmap :: Fn j a b -> Fn k (f a) (f b)
 
--- | Embedding 'Bifunctor' as two instances of @Punctor@
+
+-- | And @Bifunctor f@ can be replaced with @(Punctor f, ∀a. Punctor (f a))@,
+--   as in \"bi-pun-map\" below.
+--
+-- Actually it's not a bifunctor unless:
+-- > bimap fnA id . bimap id fnB = bimap fnA fnB = bimap id fnB . bimap fnA id
+-- 
+-- But for most of instances like @f :: Type -> Type -> Type@, it's guaranteed by
+-- parametricity and @Punctor@ laws.
+bunmap ::
+  (Punctor f, ∀a. Punctor (f a), Category (Fn l)) => Fn j a a' -> Fn k b b' -> Fn l (f a b) (f a' b')
+bunmap fnA fnB = runPoly (punmap fnA) . punmap fnB
+
+-- | You can represent a 'Bifunctor' as two instances of @Punctor@
 newtype FromBifunctor f a b = FromBifunctor (f a b)
   deriving Bifunctor via f
 instance Bifunctor f => Punctor (FromBifunctor f) where
     punmap fnA = Poly $ first fnA
 instance Bifunctor f => Punctor (FromBifunctor f a) where
     punmap = second
-
--- | And @Bifunctor f@ just means @(Punctor f, ∀a. Punctor (f a))@
---   simultaneously.
-newtype ToBifunctor f a b = ToBifunctor (f a b)
-deriving via (f :: j -> k -> Type)
-  instance Punctor f => Punctor (ToBifunctor f)
-deriving via (f a :: k -> Type)
-  instance Punctor (f a) => Punctor (ToBifunctor f a)
-
-instance (Punctor f, ∀a. Punctor (f a))
-  => Bifunctor (ToBifunctor (f :: Type -> Type -> Type)) where
-  first fnA = runPoly $ punmap fnA
-  second fnB = punmap fnB
-
-  bimap fnA fnB = runPoly (punmap fnA) . punmap fnB
-
-  -- Actually it's not a bifunctor unless
-  -- > first fnA . second fnB = second fnB . first fnA
-  -- holds, but this holds from parametricity!
 
 -- | Punctor can be defined for Higher-kinded data pattern
 data BlogArticle f = MkBlogArticle
