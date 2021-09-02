@@ -66,16 +66,10 @@ class Punctor (f :: j -> k) where
     punmap :: Fn j a b -> Fn k (f a) (f b)
 
 
--- | And @Bifunctor f@ can be replaced with @(Punctor f, ∀a. Punctor (f a))@,
---   as in \"bi-pun-map\" below.
---
--- Actually it's not a bifunctor unless:
--- > bimap fnA id . bimap id fnB = bimap fnA fnB = bimap id fnB . bimap fnA id
--- 
--- But for most of instances like @f :: Type -> Type -> Type@, it's guaranteed by
--- parametricity and @Punctor@ laws.
+-- | @Bifunctor f@ can be replaced with @(Punctor f, ∀a. Punctor (f a))@
 bunmap ::
-  (Punctor f, ∀a. Punctor (f a), Category (Fn l)) => Fn j a a' -> Fn k b b' -> Fn l (f a b) (f a' b')
+     (Punctor (f :: j -> k -> l), ∀a. Punctor (f a), Category (Fn l))
+  => Fn j a a' -> Fn k b b' -> Fn l (f a b) (f a' b')
 bunmap fnA fnB = runPoly (punmap fnA) . punmap fnB
 
 -- | You can represent a 'Bifunctor' as two instances of @Punctor@
