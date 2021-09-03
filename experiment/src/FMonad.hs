@@ -80,7 +80,7 @@ instance Functor f => FFunctor (Compose f) where
     ffmap gh = Compose . fmap gh . getCompose
 
 instance FFunctor NonTrans.Free where
-    ffmap = NonTrans.hoistFree
+    ffmap gh = NonTrans.hoistFree gh
 
 instance FFunctor IdentityT where
     ffmap fg = IdentityT . fg . runIdentityT

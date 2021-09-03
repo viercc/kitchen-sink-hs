@@ -57,7 +57,7 @@ idTransducer :: Transducer f f
 idTransducer = id
 
 composeTransducer :: Transducer f g -> Transducer g h -> Transducer f h
-composeTransducer = (.)
+composeTransducer fg gh = fg . gh
 
 idTransducer' :: (Functor f) => Transducer' f f
 idTransducer' = liftFree
