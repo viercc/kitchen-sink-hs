@@ -9,6 +9,7 @@ module ContEq2 where
 
 import Data.Foldable
 import qualified Data.Map as Map
+import Numeric.Natural
 
 newtype Cont r a = Cont { runCont :: (a -> r) -> r }
 
@@ -51,6 +52,13 @@ instance (Ord a, Searchable r, Eq r) => Eq (Cont r a) where
 class Eq a => POrd a where
   (<=?) :: a -> a -> Bool
 
+pcmp :: POrd a => a -> a -> Maybe Ordering
+pcmp x y = case (x <=? y, y <=? x) of
+  (True, True) -> Just EQ
+  (True, False) -> Just LT
+  (False, True) -> Just GT
+  (False, False) -> Nothing
+
 instance POrd Bool where
   (<=?) = (<=)
 
@@ -59,18 +67,35 @@ instance (Ord a, Searchable r, POrd r) => POrd (Cont r a) where
     where
       pointLeq ar = arr ar <=? arr' ar
 
-ex1, ex2, ex3, ex4, ex5 :: Cont Bool Integer
-ex1 = Cont $ \ib -> (ib 7 && ib 4) || ib 8
-ex2 = Cont $ \ib -> (ib 7 || ib 8) && (ib 4 || ib 8)
-ex3 = Cont $ \ib -> (ib 7 || ib 8) && ib 4
-ex4 = Cont $ \ib -> ib 7 && ib 4
-ex5 = Cont $ \ib -> ib 5
+-- Total ordering
 
-exes :: [Cont Bool Integer]
-exes = [ex1, ex2, ex3, ex4, ex5]
+cmpContNat :: Cont Bool Natural -> Cont Bool Natural -> Ordering
+cmpContNat x y = case pcmp x y of
+  Just result -> result
+  Nothing -> cmpContNat (mask False x) (mask False y)
+              <> cmpContNat (mask True x) (mask True y)
+  where
+    mask :: Bool -> Cont Bool Natural -> Cont Bool Natural
+    mask b (Cont c) = Cont $ \k -> c (\i -> if i == 0 then b else k (i - 1))
 
--- ex4 <=? ex3 <=? ex2 == ex1
--- ex5 has no relation to ex1,ex2,ex3,ex4
+-- test
+
+ex1, ex2, ex3, ex4, ex5 :: Cont Bool Natural
+ex1 = Cont $ \k -> (k 0 || k 2) && (k 1 || k 2)
+ex2 = Cont $ \k -> (k 0 && k 1) || k 2
+ex3 = Cont $ \k -> (k 0 && not (k 1)) || k 2
+ex4 = Cont $ \k -> k 0 && (k 1 || k 2)
+ex5 = Cont $ \k -> k 0 && k 1
+ex6 = Cont $ \k -> k 0 && k 2
+
+exes :: [Cont Bool Natural]
+exes = [ex1, ex2, ex3, ex4, ex5, ex6]
+
+-- ex1 == ex2   ex3
+--      \       /
+--      ex4    /
+--     /  \   /
+--   ex5   ex6
 
 main :: IO ()
 main =
@@ -83,4 +108,9 @@ main =
      forM_ exes $ \x ->
        do forM_ exes $ \y ->
             putStr $ if x <=? y then " 1" else " 0"
+          putStr "\n"
+     putStrLn "Table[cmp]"
+     forM_ exes $ \x ->
+       do forM_ exes $ \y ->
+            putStr . show $ cmpContNat x y
           putStr "\n"
