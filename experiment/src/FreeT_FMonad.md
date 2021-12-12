@@ -4,7 +4,7 @@
 
 ### FFunctor and FMonad
 
-`FFunctor` ([code](./FMonad.hs#L58))
+`FFunctor` ([code](./FMonad.hs#L69))
 
 ```haskell
 type (~>) f g = forall a. f a -> g a
@@ -20,7 +20,7 @@ class (forall g. Functor g => Functor (ff g)) => FFunctor ff where
     ffmap :: (Functor g, Functor h) => (g ~> h) -> (ff g ~> ff h)
 ```
 
-`FMonad` ([code](./FMonad.hs#L117))
+`FMonad` ([code](./FMonad.hs#L110))
 
 ```haskell
 {-| Monad on 'Functor's
@@ -55,7 +55,7 @@ class FFunctor ff => FMonad ff where
 
 ### FreeT'
 
-[FreeT'](./ListTVia.hs#L30), cf. [FreeT](https://hackage.haskell.org/package/free-5.1.3/docs/Control-Monad-Trans-Free.html#t:FreeT)
+[FreeT'](./FMonad.hs#L382), cf. [FreeT](https://hackage.haskell.org/package/free-5.1.3/docs/Control-Monad-Trans-Free.html#t:FreeT)
 
 ```haskell
 -- FreeT' is (Flip FreeT)

@@ -20,11 +20,14 @@ library
                    ListTVia, FMonadExamples, FMonad,
                    Poifree, PartialMonad,
                    Newtypes, HeytingApplicative, Hoard,
-                   CoerceUnder
+                   CoerceUnder,
+                   PartialMonoid,
+                   DifferenceApplicative
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
                      , newtype
+                     , generics-sop
                      
                      , containers
                      , data-ordlist
@@ -36,6 +39,7 @@ library
                      , these
                      , finite-typelits
                      , finitary
+                     , partial-semigroup
                      
                      , transformers
                      , mtl
