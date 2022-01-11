@@ -142,32 +142,36 @@ instance Category cat => PartialMonoid (DynCategory cat) where
 
 data Level = Z | S Level
 
-class (forall n. PartialMonoid (u n)) => Unicategory u where
+class (forall n. PartialMonoid (u ('S n))) => Unicategory u where
     identity :: u n -> u ('S n)
     boundary :: u ('S n) -> (u n, u n)
 
-    -- boundary f = (x,x') 
-    -- boundary g = (y,y')
-    -- x <>? y = Just xy
-    -- x' <>? y' = Just x'y'
-    
-    -- f <+>? g = Just fg
-    -- boundary fg = (xy, x'y')
-    (<+>?) :: u ('S n) -> u ('S n) -> Maybe (u ('S n))
-
-
     -- @identity x@ is an identity (in the PartialMonoid sense)
 
-    -- interchange laws
-    -- f, f', g, g' :: u ('S ('S n))
-    -- 
-    -- f <>? g
 
     -- leftId = identity . fst . boundary
     -- rightId = identity . snd . boundary
 
     -- boundary . identity = \x -> (x,x)
     -- boundary . fst . boundary = boundary . snd . boundary
+
+    -- boundary f = (x,x') 
+    -- boundary g = (y,y')
+    -- x <>? y = Just xy
+    -- x' <>? y' = Just x'y'
+    
+    -- | Left whisker
+    -- 
+    -- > boundary x = (g, g')
+    --
+    -- @f <>? g = Just fg@ ⇔ @f <>? g' = Just fg'@ ⇔ @f ~~< x = Just fx@
+    --
+    -- > boundary fx = (fg, fg')
+    -- 
+    -- > boundary y = (g', g'')
+    -- > x <>? y = Just xy
+    (~~<) :: u n -> u ('S n) -> Maybe (u ('S n))
+
 
 data FromCategory k (cat :: k -> k -> Type) (n :: Level) where
     Obj :: TypeRep (a :: k) -> FromCategory k cat 'Z

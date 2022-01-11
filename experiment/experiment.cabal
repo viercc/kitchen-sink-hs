@@ -22,7 +22,8 @@ library
                    Newtypes, HeytingApplicative, Hoard,
                    CoerceUnder,
                    PartialMonoid,
-                   DifferenceApplicative
+                   DifferenceApplicative, Rank2Unzip,
+                   PureSet, SetExtra
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
@@ -33,9 +34,12 @@ library
                      , data-ordlist
                      , vector
 
+                     , integer-logarithms
+
                      , lens
                      , selective
                      , semialign
+                     , rank2classes
                      , these
                      , finite-typelits
                      , finitary
