@@ -31,6 +31,7 @@ instance PFunctor f => Functor (Pt f) where
 
 class PFunctor m => PMonad m where
   ppure :: a -? m a
+  pbind :: (a -? m b) -> m a -? m b
   pjoin :: m (m a) -? m a
 
 instance PMonad m => Applicative (Pt m) where
