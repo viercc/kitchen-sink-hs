@@ -36,7 +36,7 @@ type F x = Σ(i :: Con). (E i -> x)
 
 * `F ()` は `Con` と同型である。
 
-### Readerモナド
+### `ReaderT A Maybe`の埋め込み定理
 
 `T` をモナドとする。`T` に対してある型 `A` が存在して、以下の2つのモナド準同型が存在するとする。
 
@@ -139,3 +139,131 @@ rp . join @RP
   = join . fmap pr . pr
 ```
 
+`r` と `p` がともに単射である状況を考える。（TODO:自然変換が単射⇔各成分が単射）
+
+> `r` と `p` が単射であれば `rp` も単射である
+
+Remark. このとき `pure = p . Just` も単射である。`Just :: a -> Maybe a` は定義から単射である。
+
+証明のため、以下の `split` と `repair` という関数を考える。
+
+```haskell
+split :: R (Bool, x) -> (R (P x), R (P x))
+split rbx = (fmap getLeft rbx, fmap getRight rbx)
+
+getLeft :: Either x y -> Maybe x
+getLeft = either Just (const Nothing)
+
+getRight :: Either x y -> Maybe y
+getRight = either (const Nothing) Just
+
+repair :: (T x, T y) -> (A -> Bool) -> T (Either x y)
+repair (tx, ty) cond = join . r $ \i -> if cond i then fmap Left tx else fmap Right ty
+```
+
+次の関数`rezip`は、（1変数関数として）単射であることを示す。
+
+```haskell
+rezip :: R (Either x y) -> (A -> Bool) -> T (Either x y)
+rezip = repair . (rp *** rp) . split
+```
+
+`rezip`を既知の`rp`の性質を使って計算すると、
+以下のようになる。
+
+```haskell
+xy :: R (Either x y)
+cond :: A -> Bool
+
+rezip xy cond
+  = repair ((rp *** rp) (split xy)) cond
+  = repair (rp (fmap getLeft xy), rp (fmap getRight xy)) cond
+  = join . r $ \i ->
+      if cond i then fmap Left  (rp (fmap getLeft xy))
+                else fmap Right (rp (fmap getRight xy))
+  = join . r . fmap rp $ \i ->
+      if cond i then (fmap (fmap Left)  . fmap getLeft) xy
+                else (fmap (fmap Right) . fmap getRight) xy
+  = join . r . fmap (join . r . fmap p) $ \i ->
+      if cond i then fmap (fmap Left  . getLeft) xy
+                else fmap (fmap Right . getRight) xy
+    -- ここで、`$` の手前は
+          join . r . fmap (join . r . fmap p)
+        = join . fmap join . r . fmap r . fmap (fmap p)
+        = join . join . r . fmap r . fmap (fmap p)
+        = join . r . join @R . fmap (fmap p)
+        = join . r . fmap p . join @R
+    -- であるから
+  = join . r . fmap p . join @R $ \i -> 
+      if cond i then fmap (fmap Left  . getLeft) xy
+                else fmap (fmap Right . getRight) xy
+  = rp $ \i -> 
+      if cond i then (fmap Left  . getLeft) (xy i)
+                else (fmap Right . getRight) (xy i)
+  = rp $ \i ->
+      if cond i
+        then if isLeft (xy i)
+                then Just (xy i)
+                else Nothing
+        else if isRight (xy i)
+                then Just (xy i)
+                else Nothing
+  = rp $ \i -> if cond i == isLeft (xy i) then Just (xy i) else Nothing
+```
+
+この結果より、以下の2点がいえる。
+
+* `cond = isLeft . xy` ⇔ `rezip xy cond = r xy`
+
+  なぜならば、`cond = isLeft . xy`であるとき、
+  
+  ```haskell
+  rezip xy cond 
+    = rp $ \i -> if cond i == isLeft (xy i) then Just (xy i) else Nothing
+    = rp $ \i -> Just (xy i)
+    = join . r . fmap p . fmap Just $ \i -> xy i
+    = join . fmap pure . r $ xy
+    = r xy
+  ```
+  
+  また、`cond /= isLeft . xy` であるとき、`cond i /= isLeft (xy i)` であるような `i` が存在する。
+  `r xy :: T (Either x y)` は、`r`の単射性から `xy i :: Either x y` の値に依存するが、
+  `rezip xy cond` においては `xy i` の値に依存せず、したがって `xy' /= r xy` である。
+
+* `cond = not . isLeft . xy` ⇔ `rezip xy cond = p Nothing`
+
+  ⇒は同様に計算するだけでわかる。⇐の対偶を示すため、`cond /= not . isLeft . xy`であったとする。
+  
+  前述した計算結果から、`rezip xy cond`は、適当な`u :: R (P (Either x y))`によって`rp u`と書ける。
+  ここで、`v :: R (P z)`であって、`(u, v) = split uv`であるような`v`と`uv`を考えると、
+
+  ```haskell
+  rezip uv cond'
+    = repair (rp u, rp v) cond'
+    = repair (rezip xy cond, rp v) cond'
+  ```
+  
+  である。`u` は、`cond i == isLeft (xy i)`を満たす `i` において `u i = Just (xy i)`となっているが、
+  `rezip xy cond = p Nothing`ならば`rezip uv cond'` は `xy i` に依存できないことがわかる。
+  しかし、`cond' = isLeft uv'`とすれば、
+  前節の通り `rezip uv cond' = r uv`なのであるから、`uv i = Left (xy i)`には明らかに依存する。
+  仮定から`cond i == isLeft (xy i)`を満たす `i` は常に存在するので、これは不合理である。したがって
+  `rezip xy cond = p Nothing`であってはならない。
+
+よって、任意の`xy1, xy2 :: R (Either x y)` かつ `xy1 /= xy2`に対して、
+
+* `cond = isLeft . xy1 = isLeft . xy2` であるとき、 `rezip xy1 cond = r xy1 /= r xy2 = rezip xy2 cond`
+* `isLeft . xy1 /= isLeft . xy2` であるとき、 `rezip xy1 (not . isLeft . xy1) = p Nothing /= rezip xy2 (not . isLeft . xy1)`
+
+であるから、`rezip`は単射である。
+
+さて、以下の`rezip`は単射なのであったが、`split`が単射であることから
+`rp *** rp`も単射でなければならない。
+
+```haskell
+rezip :: R (Either x y) -> (A -> Bool) -> T (Either x y)
+rezip = repair . (rp *** rp) . split
+```
+
+一般論として、`f *** g`が単射であることと、`f`と`g`がいずれも単射であることは同値である。
+従って、`rp`も単射でなければならない。
