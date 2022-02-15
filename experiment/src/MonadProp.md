@@ -143,127 +143,149 @@ rp . join @RP
 
 > `r` と `p` が単射であれば `rp` も単射である
 
-Remark. このとき `pure = p . Just` も単射である。`Just :: a -> Maybe a` は定義から単射である。
+Remark. このとき `pure = p . Just` も単射であり、任意の `x` に対して `pure x /= p Nothing` である。
 
-証明のため、以下の `split` と `repair` という関数を考える。
+以下、証明のために次の`reconstruct`という関数を考える。
 
 ```haskell
-split :: R (Bool, x) -> (R (P x), R (P x))
-split rbx = (fmap getLeft rbx, fmap getRight rbx)
+onlyWhen :: (A -> Bool) -> R x -> R (P x)
+onlyWhen cond x = \i -> if cond i then Just (x i) else Nothing
 
-getLeft :: Either x y -> Maybe x
-getLeft = either Just (const Nothing)
-
-getRight :: Either x y -> Maybe y
-getRight = either (const Nothing) Just
-
-repair :: (T x, T y) -> (A -> Bool) -> T (Either x y)
-repair (tx, ty) cond = join . r $ \i -> if cond i then fmap Left tx else fmap Right ty
+reconstruct :: (A -> Bool) -> R x -> T x
+reconstruct cond x = join . rp $ \i ->
+  if cond i then Just (rp (onlyWhen cond x)) else Just (rp (onlyWhen (not . cond) x))
 ```
 
-次の関数`rezip`は、（1変数関数として）単射であることを示す。
+ここで、`rp`がモナド準同型であったことをもとに`reconstruct`を計算すると、
 
 ```haskell
-rezip :: R (Either x y) -> (A -> Bool) -> T (Either x y)
-rezip = repair . (rp *** rp) . split
-```
-
-`rezip`を既知の`rp`の性質を使って計算すると、
-以下のようになる。
-
-```haskell
-xy :: R (Either x y)
-cond :: A -> Bool
-
-rezip xy cond
-  = repair ((rp *** rp) (split xy)) cond
-  = repair (rp (fmap getLeft xy), rp (fmap getRight xy)) cond
-  = join . r $ \i ->
-      if cond i then fmap Left  (rp (fmap getLeft xy))
-                else fmap Right (rp (fmap getRight xy))
-  = join . r . fmap rp $ \i ->
-      if cond i then (fmap (fmap Left)  . fmap getLeft) xy
-                else (fmap (fmap Right) . fmap getRight) xy
-  = join . r . fmap (join . r . fmap p) $ \i ->
-      if cond i then fmap (fmap Left  . getLeft) xy
-                else fmap (fmap Right . getRight) xy
-    -- ここで、`$` の手前は
-          join . r . fmap (join . r . fmap p)
-        = join . fmap join . r . fmap r . fmap (fmap p)
-        = join . join . r . fmap r . fmap (fmap p)
-        = join . r . join @R . fmap (fmap p)
-        = join . r . fmap p . join @R
-    -- であるから
-  = join . r . fmap p . join @R $ \i -> 
-      if cond i then fmap (fmap Left  . getLeft) xy
-                else fmap (fmap Right . getRight) xy
-  = rp $ \i -> 
-      if cond i then (fmap Left  . getLeft) (xy i)
-                else (fmap Right . getRight) (xy i)
+reconstruct cond x
+  = join . rp $ \i ->
+      if cond i then Just (rp (onlyWhen cond x)) else Just (rp (onlyWhen (not . cond) x))
+  = join . rp . fmap @RP rp $ \i ->
+      if cond i then Just (onlyWhen cond x) else Just (onlyWhen (not . cond) x)
+    -- rpはモナド準同型
+  = rp . join @RP $ \i ->
+      if cond i then Just (onlyWhen cond x) else Just (onlyWhen (not . cond) x)
   = rp $ \i ->
-      if cond i
-        then if isLeft (xy i)
-                then Just (xy i)
-                else Nothing
-        else if isRight (xy i)
-                then Just (xy i)
-                else Nothing
-  = rp $ \i -> if cond i == isLeft (xy i) then Just (xy i) else Nothing
+      if cond i then onlyWhen cond x i else onlyWhen (not . cond) i x
+  = rp $ \i ->
+      if cond i then Just (x i) else Just (x i)
+  = rp $ \i -> Just (x i)
+  = r x
 ```
 
-この結果より、以下の2点がいえる。
+である。特に、`r`は単射であったことから、
+`reconstruct cond x`はどの点`i :: A`においても`x i`に依存することに注意する。
 
-* `cond = isLeft . xy` ⇔ `rezip xy cond = r xy`
+`x`が`Void`のように空な型であるとき、`R (P x) = A -> Maybe x` は`const Nothing`以外の値をとれず、
+`()`と同型である。このとき、`rp :: R (P x) -> T x`は自明に単射である。
+そのため、以下`x`は空でないと仮定する。
 
-  なぜならば、`cond = isLeft . xy`であるとき、
-  
-  ```haskell
-  rezip xy cond 
-    = rp $ \i -> if cond i == isLeft (xy i) then Just (xy i) else Nothing
-    = rp $ \i -> Just (xy i)
-    = join . r . fmap p . fmap Just $ \i -> xy i
-    = join . fmap pure . r $ xy
-    = r xy
-  ```
-  
-  また、`cond /= isLeft . xy` であるとき、`cond i /= isLeft (xy i)` であるような `i` が存在する。
-  `r xy :: T (Either x y)` は、`r`の単射性から `xy i :: Either x y` の値に依存するが、
-  `rezip xy cond` においては `xy i` の値に依存せず、したがって `xy' /= r xy` である。
+Fact1. `rp y = p Nothing` ならば `y = const Nothing`
 
-* `cond = not . isLeft . xy` ⇔ `rezip xy cond = p Nothing`
+`x`が空でなければ、`y :: R (P x)` は、ある `x, cond` によって `y = onlyWhen cond x` と書ける。
+もし `rp y = p Nothing` であれば、それはどの `i :: A` についても `x i` に依存していないため、
+`reconstruct cond x`がすべての `i :: A` について `x i` に依存するために、
+任意の `i` に対して `onlyWhen (not . cond) x i = Just (x i)`でなければならない。
+これはすなわち、`not . cond = const True`であり、
+`y = onlyWhen cond x = onlyWhen (const False) x = const Nothing`を意味する。
 
-  ⇒は同様に計算するだけでわかる。⇐の対偶を示すため、`cond /= not . isLeft . xy`であったとする。
-  
-  前述した計算結果から、`rezip xy cond`は、適当な`u :: R (P (Either x y))`によって`rp u`と書ける。
-  ここで、`v :: R (P z)`であって、`(u, v) = split uv`であるような`v`と`uv`を考えると、
+Fact2. `()`における自然変換`rp`の成分 `rp :: R (P ()) -> T ()` は単射である。
 
-  ```haskell
-  rezip uv cond'
-    = repair (rp u, rp v) cond'
-    = repair (rezip xy cond, rp v) cond'
-  ```
-  
-  である。`u` は、`cond i == isLeft (xy i)`を満たす `i` において `u i = Just (xy i)`となっているが、
-  `rezip xy cond = p Nothing`ならば`rezip uv cond'` は `xy i` に依存できないことがわかる。
-  しかし、`cond' = isLeft uv'`とすれば、
-  前節の通り `rezip uv cond' = r uv`なのであるから、`uv i = Left (xy i)`には明らかに依存する。
-  仮定から`cond i == isLeft (xy i)`を満たす `i` は常に存在するので、これは不合理である。したがって
-  `rezip xy cond = p Nothing`であってはならない。
-
-よって、任意の`xy1, xy2 :: R (Either x y)` かつ `xy1 /= xy2`に対して、
-
-* `cond = isLeft . xy1 = isLeft . xy2` であるとき、 `rezip xy1 cond = r xy1 /= r xy2 = rezip xy2 cond`
-* `isLeft . xy1 /= isLeft . xy2` であるとき、 `rezip xy1 (not . isLeft . xy1) = p Nothing /= rezip xy2 (not . isLeft . xy1)`
-
-であるから、`rezip`は単射である。
-
-さて、以下の`rezip`は単射なのであったが、`split`が単射であることから
-`rp *** rp`も単射でなければならない。
+次の関数 `intersection` を考える。
 
 ```haskell
-rezip :: R (Either x y) -> (A -> Bool) -> T (Either x y)
-rezip = repair . (rp *** rp) . split
+(>>) :: T a -> T b -> T b
+t >> u = join $ fmap (const u) t
+
+intersection :: R (P ()) -> R (P ()) -> T ()
+intersection x y = rp x >> rp y
 ```
 
-一般論として、`f *** g`が単射であることと、`f`と`g`がいずれも単射であることは同値である。
-従って、`rp`も単射でなければならない。
+`intersection x y`は`rp z`の形に書くことができる。
+
+```haskell
+intersection x y
+  = join . fmap (const (rp y)) $ rp x
+  = join . fmap rp . fmap (const y) . rp $ x
+  = join . fmap rp . rp $ fmap (const y) x
+  = rp . join @RP $ fmap (const y) x
+  = rp $ \i -> x i >>= const (y i)
+  = rp $ \i -> andP (x i) (y i)
+    where andP (Just ()) (Just ()) = Just ()
+          andP _         _         = Nothing
+```
+
+ここで、`intersection x1 = intersection x2`が成り立っていたとする。
+すなわち、任意の `y`に対して`intersection x1 y = intersection x2 y`である。
+
+ここで、`y1, y2`を以下のようにとる。
+
+```haskell
+y1, y2 :: R (P ())
+y1 i = x1 i `subP` x2 i
+y2 i = x2 i `subP` x2 i
+
+subP :: P () -> P () -> P ()
+subP (Just ()) Nothing = Just ()
+subP _         _       = Nothing
+```
+
+いま、`y1, y2`の構成から
+
+* `intersection x1 y2 = p Nothing`
+* `intersection x2 y1 = p Nothing`
+
+である。仮定より
+
+* `intersection x1 y1 = p Nothing`
+* `intersection x2 y2 = p Nothing`
+
+でもあり、更に `intersection x y = p Nothing`が成り立つのは、
+任意の`i`に対して`x i == Nothing || y i == Nothing`が成り立つときに限る (∵Fact1) から、
+
+* 任意の`i`に対して `x1 i == Nothing || x2 i /= Nothing` が成り立つ
+* 任意の`i`に対して `x2 i == Nothing || x1 i /= Nothing` が成り立つ
+
+よって、任意の`i`に対して `x1 i == x2 i` である。
+すなわち、`intersection`は`x`単独の関数として単射である。
+これは `rp :: R (P ()) -> T ()` も単射でなければ不可能である。
+
+Fact3. 任意の`a`について`rp :: R (P a) -> T a`は単射である。
+
+`rp y1 = rp y2`が成り立つ`y1, y2 :: R (P a)`について、`y1 = y2`を示す。
+
+Fact1を示すときに述べたように、
+
+* `x1, cond1`が存在して`y1 = onlyWhen cond1 x1`
+* `x2, cond2`が存在して`y2 = onlyWhen cond2 x2`
+
+とできる。更に、`a`は空でないので、ある`x0 :: a`をとって、
+
+* `cond1 i == False`のとき`x1 i = x0`
+* `cond2 i == False`のとき`x2 i = x0`
+
+となるように`x1, x2`をとることができる。
+
+また、Fact2から、`rp y1 = rp y2`であれば`cond1 = cond2`となるから、`cond1 = cond2 = cond`とできる。
+このとき、
+
+```haskell
+r x1
+  = reconstruct cond x1
+  = join . rp $ \i ->
+      if cond i then Just (rp (onlyWhen cond x1)) else Just (rp (onlyWhen (not . cond) x1))
+  = join . rp $ \i ->
+      if cond i then Just (rp y1) else Just (rp (onlyWhen (not . cond) (const x0)))
+    -- 仮定より rp y1 = rp y2
+  = join . rp $ \i ->
+      if cond i then Just (rp y2) else Just (rp (onlyWhen (not . cond) (const x0)))
+  = join . rp $ \i ->
+      if cond i then Just (rp (onlyWhen cond x2)) else Just (rp (onlyWhen (not . cond) x2))
+  = reconstruct cond x2
+  = r x2
+```
+
+より`x1 = x2`、したがって`y1 = y2`である。
+よって`rp`が単射であることが示された。

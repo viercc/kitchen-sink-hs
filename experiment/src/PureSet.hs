@@ -49,13 +49,6 @@ data Set = MkSet !(D.Set Set) -- ^ Large part
 instance Ord Set where
     compare (MkSet xlarge x) (MkSet ylarge y) =
         compare (D.toDescList xlarge) (D.toDescList ylarge) <> compare x y
-    (<=) (MkSet xlarge x) (MkSet ylarge y) =
-        D.toDescList xlarge <= D.toDescList ylarge && x <= y
-    (<) (MkSet xlarge x) (MkSet ylarge y)=
-        D.toDescList xlarge < D.toDescList ylarge && x < y
-    
-    (>=) = flip (<=)
-    (>) = flip (<)
 
 instance Show Set where
     showsPrec _ = showsBrackets
@@ -152,8 +145,12 @@ instance Ext.IsList Set where
 -- | Bijection from 'Set' to 'Natural'.
 --
 --   CAUTION: The result of this function can be very very large,
---   which can consume huge amount of memory. Also, because
---   technically
+--   which means it can consume huge amount of memory.
+--   
+--   Also, technically this function is partial, because it gives up constructing
+--   a value of @Natural@ that is greater than 2^(2^63) - 1,
+--   by failing to address a set bit within @Int@. But we can't care,
+--   because these values require at least 2^55 B ≒ 36PB for each anyway.
 toNatural :: Set -> Natural
 toNatural (MkSet xlarge x) = foldl' (.|.) (fromIntegral x) (safeBit <$> D.toDescList xlarge)
   where
