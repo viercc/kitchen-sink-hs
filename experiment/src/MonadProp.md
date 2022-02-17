@@ -1,75 +1,60 @@
 # 多項式モナドの性質
 
-## 定義
+## `ReaderT A Maybe` は `ReaderA` と `Maybe` の余積である
 
-### 有限な型と離散的な型
-
-`Nat` を自然数の型とする。`[0], [1], ..., [m], ...`を、それぞれ
-`m` 未満の自然数からなる型とする。
-
-型 `X` が_有限である_とは、ある自然数`m`に対して単射 `f :: X -> [m]` を持つことである。
-
-型 `X` に対して、単射 `f :: X -> [m]` をもつような最小の `m` を `X` の_大きさ_とよび、
-`|X|` と表記することにする。
-
-Remark. 大きさ `m` を持つ型は、濃度 `m` をもつ有限集合とみなすことができる。
-Remark. 型の大きさは同型で保たれる。
-
-Example:
-
-* `()` は大きさ `|()| = 1` をもつ有限な型である。
-* `Bool` は大きさ `|Bool| = 1` をもつ有限な型である。
-* `[m]` は大きさ `m` をもつ有限な型である。
-* `Void` は大きさ `|Void| = 0` をもつ有限な型である。
-* `Nat` は有限な型ではない。
-* `A`が有限な型であれば、`Maybe A`は大きさ `|Maybe A| = 1 + |A|` をもつ有限な型である。
-
-### 多項式Functor
-
-多項式Functorとは、ある型 `Con` と、`Con`に依存する有限な型の族 `E :: Con -> Type`を用いて、関手
+ある型`A`に対して、モナド`Reader A _ = (A -> _)`を`R`、モナド`Maybe _`を`P`と短く書くことにする。
+更に、`R ∘ P = ReaderT A Maybe = MaybeT (Reader A)`もモナドであり、このモナドも`RP`と短く書く。
 
 ```haskell
-type F x = Σ(i :: Con). (E i -> x)
+-- Pseudo-Haskell
+type RP = R ∘ P
+--   RP x = A -> Maybe x
+
+dist :: P (R x) -> RP x
+--   :: Maybe (A -> x) -> A -> Maybe x
+dist prx a = fmap ($ a) prx
+
+instance Monad RP where
+    pure :: x -> RP x
+    --   :: x -> (A -> Maybe x)
+    pure x = const (Just x)
+    
+    join :: RP (RP x) -> RP x
+    --   :: (A -> Maybe (A -> Maybe x)) -> (A -> Maybe x)
+    join = fmap (join @P) . join @R . fmap dist
 ```
 
-と同型になるようなFunctorである。
+`RP`は、`ReaderT A`と`MaybeT`の両方のモナド変換子の結果であることから、
+`R`からも`P`からも`RP`へ持ち上げるモナド準同型がある。
 
-* `F ()` は `Con` と同型である。
+```haskell
+-- liftR :: (A -> a) -> (A -> Maybe a)
+liftR :: R a -> RP a
+liftR = fmap (pure @P)
+      = fmap Just
 
-### `ReaderT A Maybe`の埋め込み定理
+-- liftP :: Maybe a -> (A -> Maybe a)
+liftP :: P a -> RP a
+liftP = pure @r
+      = const
+```
 
 `T` をモナドとする。`T` に対してある型 `A` が存在して、以下の2つのモナド準同型が存在するとする。
-
-* モナド `R = Reader A` から `T` へのモナド準同型`r`
-* モナド `P = Maybe` から `T` へのモナド準同型`p`
 
 ```haskell
 r :: R x -> T x
 p :: P x -> T x
 ```
 
-`R ∘ P` は、`ReaderT A Maybe` としてモナドの演算を入れることができる。
+このとき、以下のように定義される`RP` から `T` への自然変換`rp`は、モナド準同型であり、
+`r = rp . liftR` と `p = rp . liftP`を満たす。
 
 ```haskell
-dist :: P (R x) -> R (P x) -- Maybe (A -> x) -> A -> Maybe x
-dist prx a = fmap ($ a) prx
-
-instance Monad (R ∘ P) where
-    pure :: x -> R (P x)
-    pure x = const (Just x)
-
-    join :: R (P (R (P x))) -> R (P x)
-    join = fmap (join @P) . join @R . fmap dist
-```
-
-このとき、以下のように定義される`R ∘ P` から `T` への自然変換`rp`は、モナド準同型である。
-
-```haskell
-rp :: R (P x) -> T x
+rp :: RP x -> T x
 rp = join @T . r . fmap p
 ```
 
-このためにまず、 `dist` による `P` と `R` の順序の入れ替えが、
+これを示すためにまず、 `dist` による `P` と `R` の順序の入れ替えが、
 `r, p` によってモナド `T` にうつしたとき、 `T` のモナド乗法では可換になることをみる。
 すなわち、以下の自然変換`pr`を用いて、`rp . dist = pr` が成り立つ。
 
@@ -105,7 +90,6 @@ pr (Just f)
 これを用いてrpがモナド準同型であることを証明する。
 
 ```haskell
-type RP = R ∘ P
 -- preserve pure
 rp . pure @RP
   = join . r . fmap p . pure @R . pure @P
@@ -139,19 +123,25 @@ rp . join @RP
   = join . fmap pr . pr
 ```
 
-`r` と `p` がともに単射である状況を考える。（TODO:自然変換が単射⇔各成分が単射）
+### 余積 `rp` は単射を保つ（！）
 
-> `r` と `p` が単射であれば `rp` も単射である
+`r` と `p` がそれぞれ単射ならば、`rp` も単射であることを示す。
 
-Remark. このとき `pure = p . Just` も単射であり、任意の `x` に対して `pure x /= p Nothing` である。
+Remark. これは普通のことでは全くない。例えば、`Hask`における余積`Either`が持つ普遍射
+`either :: (x -> z) -> (y -> z) -> Either x y -> z`においては、
+`f,g`がそれぞれ単射であっても`either f g`が単射であるとは限らない。
+同じことが起きる例には、「アーベル群の圏における ℤ/cℤ と ℤ/dℤ の余積でcとdが互いに素なとき」などがある。
+
+
+Remark. このとき任意の `x` に対して `pure x = p (Just x) /= p Nothing` である。
 
 以下、証明のために次の`reconstruct`という関数を考える。
 
 ```haskell
-onlyWhen :: (A -> Bool) -> R x -> R (P x)
+onlyWhen :: (A -> Bool) -> R a -> R (P a)
 onlyWhen cond x = \i -> if cond i then Just (x i) else Nothing
 
-reconstruct :: (A -> Bool) -> R x -> T x
+reconstruct :: (A -> Bool) -> R a -> T a
 reconstruct cond x = join . rp $ \i ->
   if cond i then Just (rp (onlyWhen cond x)) else Just (rp (onlyWhen (not . cond) x))
 ```
@@ -178,13 +168,26 @@ reconstruct cond x
 である。特に、`r`は単射であったことから、
 `reconstruct cond x`はどの点`i :: A`においても`x i`に依存することに注意する。
 
-`x`が`Void`のように空な型であるとき、`R (P x) = A -> Maybe x` は`const Nothing`以外の値をとれず、
-`()`と同型である。このとき、`rp :: R (P x) -> T x`は自明に単射である。
-そのため、以下`x`は空でないと仮定する。
+ここでは、「`a`が任意の空でない型ならば`rp :: R (P a) -> T a`が単射である」を示す。
+`a`が空であるかどうか不明の、完全に任意の型である場合は、
+
+* `fmap Just . rp = rp :: R (P (Maybe a)) -> T (Maybe a)` は、`Maybe a`が空でないので単射である
+* `fmap Just`は単射である
+
+ことから示せるので、`a`は空でなく、特にある`x0 :: a`が存在すると仮定できる。
 
 Fact1. `rp y = p Nothing` ならば `y = const Nothing`
 
-`x`が空でなければ、`y :: R (P x)` は、ある `x, cond` によって `y = onlyWhen cond x` と書ける。
+`y :: R (P a)` は、以下の `x, cond` によって `y = onlyWhen cond x` と書ける。
+
+```haskell
+x :: A -> a
+x = fromMaybe x0 . y
+
+cond :: A -> Bool
+cond = isJust . y
+```
+
 もし `rp y = p Nothing` であれば、それはどの `i :: A` についても `x i` に依存していないため、
 `reconstruct cond x`がすべての `i :: A` について `x i` に依存するために、
 任意の `i` に対して `onlyWhen (not . cond) x i = Just (x i)`でなければならない。
@@ -261,12 +264,12 @@ Fact1を示すときに述べたように、
 * `x1, cond1`が存在して`y1 = onlyWhen cond1 x1`
 * `x2, cond2`が存在して`y2 = onlyWhen cond2 x2`
 
-とできる。更に、`a`は空でないので、ある`x0 :: a`をとって、
+とできる。更に、`y1, y2`に関係しない点 `i :: A` では`x1 i = x0, x2 i = x0`となる、すなわち
 
-* `cond1 i == False`のとき`x1 i = x0`
-* `cond2 i == False`のとき`x2 i = x0`
+* `onlyWhen (not . cond1) x1 = onlyWhen (not . cond1) (const x0)`
+* `onlyWhen (not . cond2) x2 = onlyWhen (not . cond2) (const x0)`
 
-となるように`x1, x2`をとることができる。
+が成り立つように`x1, x2`をとることができる。
 
 また、Fact2から、`rp y1 = rp y2`であれば`cond1 = cond2`となるから、`cond1 = cond2 = cond`とできる。
 このとき、
@@ -289,3 +292,41 @@ r x1
 
 より`x1 = x2`、したがって`y1 = y2`である。
 よって`rp`が単射であることが示された。
+
+
+## 多項式 Monad への `RP` の埋め込み
+
+### 有限な型と離散的な型
+
+`Nat` を自然数の型とする。`[0], [1], ..., [m], ...`を、それぞれ
+`m` 未満の自然数からなる型とする。
+
+型 `X` が_有限である_とは、ある自然数`m`に対して単射 `f :: X -> [m]` を持つことである。
+
+型 `X` に対して、単射 `f :: X -> [m]` をもつような最小の `m` を `X` の_大きさ_とよび、
+`|X|` と表記することにする。
+
+Remark. 大きさ `m` を持つ型は、濃度 `m` をもつ有限集合とみなすことができる。
+Remark. 型の大きさは同型で保たれる。
+
+Example:
+
+* `()` は大きさ `|()| = 1` をもつ有限な型である。
+* `Bool` は大きさ `|Bool| = 1` をもつ有限な型である。
+* `[m]` は大きさ `m` をもつ有限な型である。
+* `Void` は大きさ `|Void| = 0` をもつ有限な型である。
+* `Nat` は有限な型ではない。
+* `A`が有限な型であれば、`Maybe A`は大きさ `|Maybe A| = 1 + |A|` をもつ有限な型である。
+
+### 多項式Functor
+
+多項式Functorとは、ある型 `Con` と、`Con`に依存する有限な型の族 `E :: Con -> Type`を用いて、関手
+
+```haskell
+type F x = Σ(i :: Con). (E i -> x)
+```
+
+と同型になるようなFunctorである。
+
+* `F ()` は `Con` と同型である。
+* `Con = {0,1}`かつ`E 0 = [0] = {}, E 1 = [1] = {0}`で表される多項式関手は`Maybe`と同型である。
