@@ -10,10 +10,10 @@ extra-source-files:  README.md
 
 library
   hs-source-dirs:  src
-  exposed-modules: FMonad, FMonadExamples, ListTVia
+  exposed-modules: FFunctor, FMonad, FMonad.Compose, FMonad.FreeT, FMonad.State1, FMonad.Trail, ListTVia
   build-depends:       base >= 4.10 && < 5
                      , transformers
-                     , mtl
+                     , kan-extensions
                      , free
   ghc-options:       -Wall -Wcompat
                      -Wunused-packages -Wwarn=unused-packages
