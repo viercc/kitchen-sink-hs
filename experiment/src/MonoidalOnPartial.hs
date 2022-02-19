@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
-module Cats where
+module MonoidalOnPartial where
 
 import           Control.Category
 import           Prelude          hiding (Functor (..), fst, id, map, snd, (.))

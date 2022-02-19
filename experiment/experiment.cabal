@@ -5,30 +5,37 @@ homepage:            https://github.com/githubuser/experiment#readme
 license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Koji Miyazato
-copyright:           2018-2020 Koji Miyazato
+copyright:           2018-2022 Koji Miyazato
 build-type:          Simple
 extra-source-files:  README.md
 
 library
   hs-source-dirs:  src
   exposed-modules: AdHocInstances, AdditionChain, Cardinality,
-                   Cats, CheapRecord, ContEq2, Distributive, Dsl,
-                   HMatchable, Heap, LCS, LatticeLike, ListT,
-                   LogRwd, Matrix, MatrixCatamorphism,
-                   Ordinal, Polynomial, Readerize,
-                   PrismSelective, Selective2, TreesThatGrow,
-                   ListTVia, FMonadExamples, FMonad,
-                   Poifree, PartialMonad,
-                   Newtypes, HeytingApplicative, Hoard,
-                   CoerceUnder,
-                   PartialMonoid,
-                   DifferenceApplicative, Rank2Unzip,
-                   PureSet, SetExtra
+                   CheapRecord, CoerceUnder, DifferenceApplicative,
+                   Distributive, Eyes,
+
+                   Heap, HeytingApplicative, HMatchable, Hoard,
+                   KrohnRhodes,
+                   
+                   LCS, MonoidalOnPartial,
+                   Newtypes,
+                   
+                   Ordinal,
+                   PartialMonad, PartialMonoid,
+                   Poifree,
+                   Polynomial,
+
+                   PrismSelective,
+                   PureSet,
+                   Rank2Unzip,
+
+                   Selective2,
+                   SetExtra,
+                   TreesThatGrow
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
-                     , newtype
-                     , generics-sop
                      
                      , containers
                      , data-ordlist
@@ -51,9 +58,7 @@ library
                      , profunctors
                      , comonad
                      
-                     , QuickCheck
-                     
-                     , autolift
                      , lattices
   ghc-options:       -Wall -Wcompat
                      -Wunused-packages -Wwarn=unused-packages
+  default-language:  Haskell2010

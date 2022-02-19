@@ -1,7 +1,7 @@
     {-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds #-}
-    module QualPolyKindB where
+    module QualPolyKind.B where
 
-    import QualPolyKindA
+    import QualPolyKind.A
 
     -- MkB :: forall k (a :: k). (forall (m :: k -> *). m a -> m a) -> B a
     newtype B a = MkB (forall m. m a -> m a)

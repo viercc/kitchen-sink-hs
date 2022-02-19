@@ -5,7 +5,7 @@
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
-module Matrix(
+module Matrix.Sized(
   AdditiveGroup(..),
   Ring(..),
 

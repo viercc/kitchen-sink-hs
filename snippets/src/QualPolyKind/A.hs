@@ -1,4 +1,4 @@
 {-# LANGUAGE RankNTypes #-}
-module QualPolyKindA where
+module QualPolyKind.A where
 
 newtype A a = MkA (forall m. m a -> m a)

@@ -5,14 +5,14 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
-module MatrixCatamorphism(
+module Matrix.Fold(
   MatExprF(..),
   zeroE, denseE, addE, multE,
 
   evalMatExpr
 ) where
 
-import           Matrix
+import           Matrix.Sized
 
 import Data.Kind(Type)
 import GHC.TypeLits ( KnownNat, Nat )

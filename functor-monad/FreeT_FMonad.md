@@ -4,8 +4,6 @@
 
 ### FFunctor and FMonad
 
-`FFunctor` ([code](./FMonad.hs#L69))
-
 ```haskell
 type (~>) f g = forall a. f a -> g a
 
@@ -19,8 +17,6 @@ FFunctor laws:
 class (forall g. Functor g => Functor (ff g)) => FFunctor ff where
     ffmap :: (Functor g, Functor h) => (g ~> h) -> (ff g ~> ff h)
 ```
-
-`FMonad` ([code](./FMonad.hs#L110))
 
 ```haskell
 {-| Monad on 'Functor's

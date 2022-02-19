@@ -11,3 +11,6 @@ cradle:
     
     - path: "lattices/src"
       component: "lib:lattices"
+
+    - path: "snippets/src"
+      component: "lib:snippets"

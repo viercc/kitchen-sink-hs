@@ -1,3 +1,7 @@
+#!/usr/bin/env cabal
+{- cabal:
+build-depends: base, comonads, profunctors
+-}
 {-# LANGUAGE DeriveFunctor #-}
 module Main (main) where
 
