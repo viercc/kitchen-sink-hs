@@ -1,2 +1,0 @@
--- Separate this package from parent project
-packages: ./*.cabal
