@@ -39,7 +39,7 @@ test-suite esoteric-test
   build-depends: base >=4.11 && <5
                , monads-collection
   default-language: Haskell2010
-  ghc-options:      -rtsopts -with-rtsopts=-M2m
+  ghc-options:      -rtsopts -with-rtsopts=-M64m
 
 executable monad-queue-test
   main-is: QueueTest.hs
@@ -56,5 +56,5 @@ executable monad-builder-test
                , mtl
                , monads-collection
   default-language: Haskell2010
-  ghc-options:      -rtsopts -with-rtsopts=-M50m
+  ghc-options:      -rtsopts -with-rtsopts=-M64m
   
