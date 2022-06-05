@@ -10,7 +10,8 @@ extra-source-files:  README.md
 
 library
   hs-source-dirs:  src
-  exposed-modules: FFunctor, FMonad, FMonad.Compose, FMonad.FreeT, FMonad.State1, FMonad.Trail, ListTVia
+  exposed-modules: FFunctor, FMonad, FMonad.Compose, FMonad.FreeT, FMonad.State1, FMonad.Trail, ListTVia,
+                   Functor.Day.Curried
   build-depends:       base >= 4.10 && < 5
                      , transformers
                      , kan-extensions
