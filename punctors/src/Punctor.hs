@@ -1,4 +1,3 @@
-
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE QuantifiedConstraints #-}
