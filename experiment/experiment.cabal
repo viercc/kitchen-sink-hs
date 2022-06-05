@@ -32,7 +32,9 @@ library
 
                    Selective2,
                    SetExtra,
-                   TreesThatGrow
+                   TreesThatGrow,
+
+                   Isomorphisms, Isomorphisms2
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
@@ -57,6 +59,7 @@ library
                      , free
                      , profunctors
                      , comonad
+                     , kan-extensions
                      
                      , lattices
   ghc-options:       -Wall -Wcompat
