@@ -1,0 +1,14 @@
+name:                data-bag
+version:             0.1.0.0
+synopsis:            Bag, or multiset, implementation based on containers
+build-type:          Simple
+cabal-version:       >=2.0
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Data.Bag, Data.Bag.Internal
+  build-depends:       base >= 4.7 && < 5,
+                       containers, fingertree, deepseq
+  default-language:    Haskell2010
+  ghc-options:         -Wall -Wno-dodgy-exports
+

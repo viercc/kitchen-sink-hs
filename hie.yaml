@@ -17,3 +17,6 @@ cradle:
 
     - path: "snippets/src"
       component: "lib:snippets"
+
+    - path: "data-bag/src"
+      component: "lib:data-bag"
