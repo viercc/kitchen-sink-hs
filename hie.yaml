@@ -20,3 +20,6 @@ cradle:
 
     - path: "data-bag/src"
       component: "lib:data-bag"
+    
+    - path: "nerdle"
+      component: "lib:nerdle"

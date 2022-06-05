@@ -1,0 +1,12 @@
+cabal-version:       2.2
+name:                nerdle
+version:             0.1.0.0
+synopsis:            Analysis of nerdle (and other wordle-like games)
+build-type:          Simple
+extra-source-files:  ABOUT
+
+library
+  hs-source-dirs: .
+  build-depends: base >= 4.14, adjunctions, containers, data-bag
+
+  default-language: Haskell2010
