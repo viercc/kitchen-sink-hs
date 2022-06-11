@@ -48,8 +48,12 @@ fromFreqsMap = MkBag . Map.filter (> 0)
 toFreqsMap :: Bag a -> Map.Map a Int
 toFreqsMap (MkBag m) = m
 
--- | Appends two bags `a` and `b`. The count of any item in the returned bag is
---   the sum of the counts for `a` and `b`.
+-- | Appends two bags @a@ and @b@. The count of any item in the returned bag is
+--   the sum of the counts for @a@ and @b@.
+--
+--   In other words, the following holds for any @x@.
+--
+--   > 'Data.Bag.count' x (append a b) == count x a + count x b
 append :: Ord a => Bag a -> Bag a -> Bag a
 append (MkBag m1) (MkBag m2) = MkBag $ Map.unionWith (+) m1 m2
 

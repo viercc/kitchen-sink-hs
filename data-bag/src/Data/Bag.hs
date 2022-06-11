@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
--- | Bag or \'multiset\' data structure.
+-- | \"Bag\" or \"multiset\" data structure.
 module Data.Bag(
   Bag(),
   -- * Basic queries
@@ -44,10 +44,12 @@ uniqueLength (MkBag m) = Map.size m
 
 -- | Number of an item in a bag. Count is 0 if the item doesn't exist in
 --   the bag.
+--
+--   Count is always nonnegative.
 count :: Ord k => k -> Bag k -> Int
 count k (MkBag m) = Map.findWithDefault 0 k m
 
--- | `isSubsetOf a b` = forall k. `count k a <= count k b`
+-- | @isSubsetOf a b@ = forall k. @count k a <= count k b@
 isSubsetOf, isProperSubsetOf :: (Ord k) => Bag k -> Bag k -> Bool
 isSubsetOf a b = uniqueLength a <= uniqueLength b && freqsLE (toFreqs a) (toFreqs b)
 isProperSubsetOf a b = uniqueLength a <= uniqueLength b && freqsLT (toFreqs a) (toFreqs b)
@@ -89,33 +91,56 @@ pullOut x (MkBag m) = case Map.updateLookupWithKey (\_ n -> positiveInt (pred n)
 
 -- * Combine
 
--- | `union a b` is a minimum bag `c` such that `a \`isSubsetOf\` c`
---   and `b \`isSubsetOf\` c`.
+-- | @union a b@ is a bag containing items contained in bags @a@ and/or @b@.
+--   For any item @x@, the count of @x@ in @union a b@ is the larger of @count x a@ and @count x b@.
+--   In other words, the following holds for any @x@.
+--   
+--   > 'count' x ('union' a b) == max (count x a) (count x b)
+--   
+--   @union a b@ is the minimum bag @c@ such that @a `isSubsetOf` c@
+--   and @b `isSubsetOf` c@.
 union :: (Ord k) => Bag k -> Bag k -> Bag k
 union (MkBag a) (MkBag b) = MkBag $ Map.unionWith max a b
 
--- | `intersection a b` is a maximum bag `c` such that `c \`isSubsetOf\` a`
---   and `c \`isSubsetOf\` b`.
+-- | @intersections a b@ is a bag containing items contained in both bags @a@ and @b@.
+--   For any item @x@, the count of @x@ in @intersection a b@ is the smaller of @count x a@ and @count x b@.
+--   In other words, the following holds for any @x@.
+--   
+--   > 'count' x ('intersection' a b) == min (count x a) (count x b)
+--   
+--   @intersection a b@ is the maximum bag @c@ such that @c `isSubsetOf` a@
+--   and @c `isSubsetOf` b@.
 intersection :: (Ord k) => Bag k -> Bag k -> Bag k
 intersection (MkBag a) (MkBag b) =
   MkBag $ Map.intersectionWith min a b
 
--- | `difference a b` is a minimum bag `c` such that
---   `a \`isSubsetOf\` append b c`
+-- | @difference a b@ removes items from bag @a@ for every item @b@ contains, as much as possible.
+--   
+--   For any item @x@, the count of @x@ in @intersection a b@ is @count x a@ subtracted by @count x b@,
+--   but @0@ if the subtraction makes the count negative.
+--
+--   In other words, the following holds for any @x@.
+--   
+--   > 'count' x ('difference' a b) == max 0 (count x a - count x b)
+--   
+--   @difference a b@ is the minimum bag @c@ such that
+--   @a `isSubsetOf` append b c@.
 difference :: (Ord k) => Bag k -> Bag k -> Bag k
 difference (MkBag a) (MkBag b) =
   MkBag $ Map.differenceWith (\n m -> positiveInt (n - m)) a b
 
--- | `cartesianProduct a b` is a bag consists of tuples `(x,y)`
---   where `x` is from `a` and `y` is from `b`, and for any `(x,y)`
---   `count (x,y) (cartesianProduct a b) = count x a * count y b`.
+-- | @cartesianProduct a b@ is a bag consists of tuples @(x,y)@
+--   where @x@ is from @a@ and @y@ is from @b@, and for any @(x,y)@
+--   @count (x,y) (cartesianProduct a b) = count x a * count y b@.
 cartesianProduct :: (Ord j, Ord k) => Bag j -> Bag k -> Bag (j,k)
 cartesianProduct a b =
   MkBag $ Map.fromDistinctAscList
     [ ((x,y), n*m) | (x,n) <- toAscFreqs a
                    , (y,m) <- toAscFreqs b ]
 
--- | O(k)
+-- * Conversion
+
+-- | O(k \* log(k))
 fromList :: Ord a => [a] -> Bag a
 fromList = F.foldl' (flip insert) empty
 
