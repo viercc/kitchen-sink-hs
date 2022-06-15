@@ -1,50 +1,45 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE DeriveTraversable #-}
-module MasterMind where
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+module WordleLike.Hint(
+  Uncertain(..), Table,
+  Hint(..),
+  
+  isCompleted, admits,
+  
+  noHint,
+  responseToHint,
+  mergeHint,
+  mergeHints
+) where
 
 import Data.Functor.Rep
 import Data.Bag qualified as Bag
 
-import Data.Traversable
-import Data.Foldable (toList)
+import Data.Foldable (toList, foldlM)
 import Data.Map (Map)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
-import Control.Monad (guard, join)
+import Control.Monad (guard)
 import Data.Monoid (Sum(..))
 import Data.Bag (Bag)
 import qualified Data.Set as Set
 
-data Response =
-      Hit  -- ^ Green in Wordle, Black peg in MasterMind
-    | Blow -- ^ Yellow in Wordle, White peg in MasterMind
-    | Miss -- ^ Grey in Wordle, no pegs in MasterMind
-    deriving (Show, Read, Eq, Ord, Enum, Bounded)
-
--- Checks if the response is valid
-response :: (Traversable v, Representable v, Ord char) => v char -> v char -> v Response
-response xs ys = respBlows $ respHits xs ys
-
-respHits :: (Representable v, Eq char) => v char -> v char -> v (Either Response (char, char))
-respHits = liftR2 both
-  where
-    both x y | x == y    = Left Hit
-             | otherwise = Right (x,y)
-
-respBlows :: (Traversable v, Ord char) => v (Either Response (char, char)) -> v Response
-respBlows rs =
-    let letterCounts = Bag.fromList [ x | Right (x,_) <- toList rs ]
-    in  snd $ mapAccumL step letterCounts rs
-  where
-    step lc resp = case resp of
-        Left a       -> (lc, a)
-        Right (x, y) -> case Bag.pullOut y lc of
-            Nothing  -> (lc, Miss)
-            Just lc' -> (lc', Blow)
+import WordleLike
 
 data Uncertain a = Unknown | Known a
     deriving (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
+
+uncertainToMaybe :: Uncertain a -> Maybe a
+uncertainToMaybe Unknown = Nothing
+uncertainToMaybe (Known a) = Just a
 
 class Unifiable a where
   unify :: a -> a -> Maybe a
@@ -58,10 +53,9 @@ instance Eq a => Unifiable (Uncertain a) where
 unifyVec :: (Traversable v, Representable v, Unifiable a) => v a -> v a -> Maybe (v a)
 unifyVec x y = sequenceA $ liftR2 unify x y
 
-responseToHint :: (Traversable v, Representable v, Ord c) => v c -> v Response -> Hint v c
-responseToHint query resp = MkHint{ knownPos=knowns, possiblePos=poss, lowerCount=lowers, frozenChars = frozen }
+responseToHint :: (Traversable v, Representable v, Ord c) => v (c,Response) -> Hint v c
+responseToHint qr= MkHint{ knownPos=knowns, possiblePos=poss, lowerCount=lowers, frozenChars = frozen }
   where
-   qr = liftR2 (,) query resp
    knowns = (\(c,r) -> if r == Hit then Known c else Unknown) <$> qr
    lowers = Bag.fromList $ foldMap (\(c,r) -> [c | r /= Miss]) qr
    frozen = Set.fromList $ foldMap (\(c,r) -> [c | r == Miss]) qr
@@ -71,6 +65,8 @@ responseToHint query resp = MkHint{ knownPos=knowns, possiblePos=poss, lowerCoun
 
 data Hint v c = MkHint { knownPos :: v (Uncertain c), possiblePos :: Table v c, lowerCount :: Bag c, frozenChars :: Set c }
 
+deriving instance (forall x. Show x => Show (v x), Show c) => Show (Hint v c)
+
 type Table v c = Map c (v Bool)
 
 popCount :: Foldable v => v Bool -> Int
@@ -79,8 +75,31 @@ popCount = getSum . foldMap (\b -> if b then 1 else 0)
 noHint :: (Representable v) => Hint v c
 noHint = MkHint{ knownPos = pureRep Unknown, possiblePos = Map.empty, lowerCount=Bag.empty, frozenChars=Set.empty}
 
+isCompleted :: (Traversable v) => Hint v c -> Maybe (v c)
+isCompleted MkHint{ knownPos } = traverse uncertainToMaybe knownPos
+
+admits :: (Traversable v, Representable v, Ord c) => Hint v c -> v c -> Bool
+admits hint query = matchKnown && matchPossible && satisfyCount && satisfyFrozenCount
+  where
+    n = length query
+    matchKnown = and $ liftR2 (\known c -> all (==c) known) (knownPos hint) query
+    possible = possiblePos hint
+    matchPossible = and $ imapRep (\i c -> maybe True (`index` i) $ Map.lookup c possible) query
+
+    qCount = Bag.fromList (toList query)
+    lCount = lowerCount hint
+    frozen = frozenChars hint
+    satisfyCount = Bag.isSubsetOf lCount qCount && Bag.size (Bag.union lCount qCount) <= n
+    satisfyFrozenCount = all (\(c,k) -> Set.notMember c frozen || k == Bag.count c lCount) (Bag.toFreqs qCount)
+
 mergeHint :: (Traversable v, Representable v, Ord c) => Hint v c -> Hint v c -> Maybe (Hint v c)
-mergeHint h1 h2 = do
+mergeHint h1 h2 = mergeHintStart h1 h2 >>= propagateLimits
+
+mergeHints :: (Traversable v, Representable v, Ord c) => [Hint v c] -> Maybe (Hint v c)
+mergeHints hints = foldlM mergeHintStart noHint hints >>= propagateLimits
+
+mergeHintStart :: (Traversable v, Representable v, Ord c) => Hint v c -> Hint v c -> Maybe (Hint v c)
+mergeHintStart !h1 !h2 = do
   knownPos' <- unifyVec (knownPos h1) (knownPos h2)
   let possiblePos' = Map.unionWith (liftR2 (&&)) (possiblePos h1) (possiblePos h2)
       lowerCount' = Bag.union (lowerCount h1) (lowerCount h2)
@@ -109,13 +128,15 @@ propagateLimitsStep hint@MkHint{ knownPos, possiblePos, lowerCount, frozenChars 
     LT -> Just frozenChars
     EQ -> Just (frozenChars `Set.union` Map.keysSet (Bag.toFreqsMap lowerCount))
     GT -> Nothing
-  
-  let knownPosFromPossible = do
+
+  let discoveries = do
         (c,n) <- Bag.toFreqs lowerCount
-        guard (c `Set.member` frozenChars')
         let v = possiblePos Map.! c
-        pure $ fmap (\b -> if b then Known c else Unknown) v
-  knownPos' <- foldr (\va mvb -> mvb >>= \vb -> unifyVec va vb) (Just $ pureRep Unknown) knownPosFromPossible
+        guard (n == popCount v)
+        let newKnowledge = fmap (\b -> if b then Known c else Unknown) v
+        [ (c, newKnowledge) ]
+  frozenChars' <- Just $ Set.union frozenChars' (Set.fromList (fst <$> discoveries))
+  knownPos' <- foldr (\va mvb -> mvb >>= \vb -> unifyVec va vb) (Just knownPos) (snd <$> discoveries)
   if and (liftR2 (==) knownPos knownPos')
     then pure (frozenChars /= frozenChars', hint{frozenChars = frozenChars'})
     else do let possiblePos' = updateKnownPossible knownPos' possiblePos

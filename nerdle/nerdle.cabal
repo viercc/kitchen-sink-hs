@@ -6,7 +6,16 @@ build-type:          Simple
 extra-source-files:  ABOUT
 
 library
-  hs-source-dirs: .
-  build-depends: base >= 4.14, adjunctions, containers, data-bag
+  hs-source-dirs: src
+  exposed-modules: V4, V6, V8, Digit, Nerdle, EliminationGame, WordleLike, WordleLike.Hint
+  build-depends: base >= 4.14, distributive, adjunctions, containers, data-bag
+  ghc-options:  -Wall -Wcompat
 
+  default-language: Haskell2010
+
+executable list-nerdle
+  hs-source-dirs: app
+  main-is: list-nerdle.hs
+  build-depends: base >= 4.14, nerdle
+  ghc-options: -Wall
   default-language: Haskell2010
