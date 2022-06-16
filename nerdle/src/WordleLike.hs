@@ -13,6 +13,7 @@ import Data.Bag qualified as Bag
 
 import Data.Traversable ( mapAccumL )
 import Data.Foldable (toList)
+import Util (eqR)
 
 data Response =
       Hit  -- ^ Green in Wordle, Black peg in MasterMind
@@ -32,9 +33,6 @@ response answer query = snd $ mapAccumL step letterCounts (liftR2 (,) answer que
 
 addResponse :: (Traversable v, Representable v, Ord char) => v char -> v char -> v (char, Response)
 addResponse answer query = liftR2 (,) query (response answer query)
-
-eqR :: (Eq a, Foldable v, Representable v) => v a -> v a -> Bool
-eqR xs ys = and $ liftR2 (==) xs ys
 
 matches :: (Traversable v, Representable v, Ord char) => v char -> v (char, Response) -> Bool
 matches query hint = eqR (response query (fst <$> hint)) (snd <$> hint)

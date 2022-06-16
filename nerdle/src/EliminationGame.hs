@@ -10,8 +10,7 @@ import Data.Ord (comparing, Down (..))
 import Data.List (sortBy)
 import Data.Foldable (minimumBy)
 
-class (Ord x) => Finite x where
-    universe :: Set x
+import Collection
 
 class (Finite x, Ord pred) => EliminationGame x pred | x -> pred where
     matches :: x -> pred -> Bool

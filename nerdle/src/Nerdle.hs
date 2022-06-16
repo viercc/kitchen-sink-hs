@@ -4,13 +4,13 @@
 module Nerdle where
 
 import Control.Applicative (liftA2, Alternative (..))
-import Data.Traversable ( mapAccumL )
 import Data.Ratio
 
 import Data.Functor.Rep
 
 import Control.Monad (guard)
 
+import Util
 import Digit
 
 data NerdleChar = Digit !Digit | Equal | Plus | Minus | Mult | Divide
@@ -90,15 +90,6 @@ evalExpr = go []
 exactInteger :: Rational -> Maybe Integer
 exactInteger x | denominator x == 1 = Just $ numerator x
                | otherwise          = Nothing
-
-repFromList :: (Traversable t, Representable t) => [a] -> Maybe (t a)
-repFromList as
-    | length as == length t0 = Just $ snd $ mapAccumL step as t0
-    | otherwise              = Nothing
-  where
-    t0 = pureRep ()
-    step [] _ = error "unreachable!"
-    step (a:as') _ = (as', a)
 
 printNerdleWord :: (Foldable t) => t NerdleChar -> String
 printNerdleWord = foldMap (pure . printNerdleChar)
