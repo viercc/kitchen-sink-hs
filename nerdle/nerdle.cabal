@@ -7,8 +7,8 @@ extra-source-files:  ABOUT
 
 library
   hs-source-dirs: src
-  exposed-modules: V4, V6, V8, Digit, Collection, Util, Nerdle, EliminationGame, WordleLike, WordleLike.Hint
-  build-depends: base >= 4.14, distributive, adjunctions, containers, vector, reflection, data-bag
+  exposed-modules: Digit, Collection, Nerdle, EliminationGame, WordleLike
+  build-depends: base >= 4.14, containers, vector, semialign, reflection, data-bag
   ghc-options:  -Wall -Wcompat
 
   default-language: Haskell2010
@@ -20,9 +20,10 @@ executable list-nerdle
   ghc-options: -Wall
   default-language: Haskell2010
 
-executable nerdle-solver
+executable wordle-solver
   hs-source-dirs: app
-  main-is: nerdle-solver.hs
+  main-is: wordle-solver.hs
+  other-modules: WordleAppCommons
   build-depends: base >= 4.14, vector, containers, nerdle
   ghc-options: -Wall
   default-language: Haskell2010

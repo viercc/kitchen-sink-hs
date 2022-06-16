@@ -8,12 +8,12 @@ module WordleLike(
   matches
 ) where
 
-import Data.Functor.Rep
+import Prelude hiding (zip, zipWith)
 import Data.Bag qualified as Bag
 
 import Data.Traversable ( mapAccumL )
+import Data.Zip
 import Data.Foldable (toList)
-import Util (eqR)
 
 data Response =
       Hit  -- ^ Green in Wordle, Black peg in MasterMind
@@ -22,17 +22,19 @@ data Response =
     deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
 -- @response answer query@
-response :: (Traversable v, Representable v, Ord char) => v char -> v char -> v Response
-response answer query = snd $ mapAccumL step letterCounts (liftR2 (,) answer query)
+response :: (Traversable v, Zip v, Ord char) => v char -> v char -> v Response
+response answer query = snd $ mapAccumL step letterCounts pairs
   where
-    letterCounts = Bag.fromList (toList answer)
-    step lc (x,y) = case Bag.pullOut y lc of
-      Nothing  -> (lc, Miss)
-      Just lc' | x == y    -> (lc', Hit)
-               | otherwise -> (lc', Blow)
+    pairs = zip answer query
+    letterCounts = Bag.fromList [ x | (x,y) <- toList pairs, x /= y ]
+    step lc (x,y)
+      | x == y = (lc, Hit)
+      | otherwise = case Bag.pullOut y lc of
+          Nothing  -> (lc, Miss)
+          Just lc' -> (lc', Blow)
 
-addResponse :: (Traversable v, Representable v, Ord char) => v char -> v char -> v (char, Response)
-addResponse answer query = liftR2 (,) query (response answer query)
+addResponse :: (Traversable v, Zip v, Ord char) => v char -> v char -> v (char, Response)
+addResponse answer query = zip query (response answer query)
 
-matches :: (Traversable v, Representable v, Ord char) => v char -> v (char, Response) -> Bool
-matches query hint = eqR (response query (fst <$> hint)) (snd <$> hint)
+matches :: (Traversable v, Zip v, Ord char) => v char -> v (char, Response) -> Bool
+matches query hint = and $ zipWith (==) (response query (fst <$> hint)) (snd <$> hint)

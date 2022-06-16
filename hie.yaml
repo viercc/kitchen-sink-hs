@@ -23,3 +23,6 @@ cradle:
     
     - path: "nerdle/src"
       component: "lib:nerdle"
+
+    - path: "nerdle/app"
+      component: "exe:wordle-solver"

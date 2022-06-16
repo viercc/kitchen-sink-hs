@@ -1,16 +1,9 @@
-
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 module Nerdle where
 
 import Control.Applicative (liftA2, Alternative (..))
 import Data.Ratio
 
-import Data.Functor.Rep
-
 import Control.Monad (guard)
-
-import Util
 import Digit
 
 data NerdleChar = Digit !Digit | Equal | Plus | Minus | Mult | Divide
@@ -122,14 +115,12 @@ enumNerdleExpr n
           y <- enumNerdleExpr (n - i - 1)
           pure $ fmap Digit x ++ op : y
 
-enumNerdleWord :: forall v. (Traversable v, Representable v) => [v NerdleChar]
-enumNerdleWord = do
+enumNerdleWord :: Int -> [[NerdleChar]]
+enumNerdleWord n = do
   xLen <- [3 .. n - 2]
   x <- enumNerdleExpr xLen
   Just y <- [ evalExpr x >>= exactInteger >>= traverse charToDigit . show ]
   -- the above line also eliminates y < 0 since (show y)
   -- produces string containing negative sign
-  Just ans <- [repFromList (x ++ Equal : fmap Digit y)]
-  pure ans
-  where n = length (pureRep @v ())
-
+  guard $ xLen + 1 + length y == n
+  pure (x ++ Equal : fmap Digit y)
