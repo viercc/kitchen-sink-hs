@@ -46,16 +46,16 @@ promptMap msg reader dict = go
 readResp :: String -> Maybe Resp
 readResp = fmap V.fromList . traverse charToResponse
   where
-    charToResponse '-' = Just Miss
-    charToResponse '+' = Just Blow
+    charToResponse '.' = Just Miss
+    charToResponse '?' = Just Blow
     charToResponse '#' = Just Hit
     charToResponse _   = Nothing
 
 printResp :: Resp -> String
 printResp = map responseChar . V.toList
   where
-    responseChar Miss = '-'
-    responseChar Blow = '+'
+    responseChar Miss = '.'
+    responseChar Blow = '?'
     responseChar Hit = '#'
 
 type Strategy s k i = s -> (i, Map k s)

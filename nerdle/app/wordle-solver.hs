@@ -5,8 +5,7 @@ module Main(main) where
 import Prelude hiding (Word)
 import Control.Monad (forever)
 import Data.Foldable
-import Data.List (sortOn)
-import Data.Ord (comparing)
+import Data.List (sortOn, mapAccumL)
 
 import System.IO
 import System.Environment (getArgs)
@@ -20,7 +19,11 @@ import Collection
 import WordleLike ( Response(..) )
 import WordleAppCommons
 
-data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath
+import System.Random.Stateful
+
+data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff
+
+data PlayDiff = Easy | Normal | Hard
 
 getOption :: IO Option
 getOption =
@@ -35,7 +38,12 @@ parseArgs args = case args of
     "--help" : rest -> (HelpMode, rest)
     "--init" : inFile : outFile : rest -> (InitMode inFile outFile, rest)
     "--solver" : inFile : rest -> (InteractiveMode inFile, rest)
-    "--play" : inFile : rest -> (PlayMode inFile, rest)
+    "--play" : inFile : rest -> case rest of
+        [] -> (PlayMode inFile Normal, [])
+        ("--easy" : rest') -> (PlayMode inFile Easy, rest')
+        ("--normal" : rest') -> (PlayMode inFile Normal, rest')
+        ("--hard" : rest') -> (PlayMode inFile Hard, rest')
+        _ -> (HelpMode, rest)
     rest -> (HelpMode, rest)
 
 readWordListFileWithMsg :: FilePath -> IO (V.Vector Word)
@@ -52,7 +60,7 @@ main = do
         HelpMode -> printHelp
         InitMode inFile outFile -> initMode inFile outFile
         InteractiveMode inFile -> interactiveMode inFile
-        PlayMode inFile -> playMode inFile
+        PlayMode inFile difficulty -> playMode inFile difficulty
 
 printHelp :: IO ()
 printHelp = putStrLn $
@@ -60,7 +68,7 @@ printHelp = putStrLn $
     "\t--help\n" ++
     "\t--init inFile outFile\n" ++
     "\t--solver inFile\n" ++
-    "\t--play inFile\n"
+    "\t--play inFile [--easy | --normal | --hard]    (default: --normal) \n"
 
 initMode :: FilePath -> FilePath -> IO ()
 initMode inFile outFile = do
@@ -108,7 +116,7 @@ interactiveMain coll = forever wizard
     
     revWordMap = Map.fromList [ (itemValue i, i) | i <- Set.toList coll ]
     askQuery = promptMap "Enter the query> " (Just . V.fromList) revWordMap
-    askResp = promptMap "Enter the response ([Miss,Blow,Hit] = [-,+,#] resp.)> " readResp
+    askResp = promptMap "Enter the response ([Miss,Blow,Hit] = [.,?,#] resp.)> " readResp
 
     describeCandidates s
       | Set.size s <= 5 = putStrLn numMsg >>
@@ -116,28 +124,59 @@ interactiveMain coll = forever wizard
       | otherwise       = putStrLn numMsg
       where numMsg = show (Set.size s) ++ " candidates remaining:"
 
-playMode :: FilePath -> IO ()
-playMode inFile = do
+playMode :: FilePath -> PlayDiff -> IO ()
+playMode inFile diff = do
     ws <- readWordListFileWithMsg inFile
-    withCollection ws playMain
+    withCollection ws (playMain diff)
 
-playMain :: (Collection Word i) => Set i -> IO ()
-playMain coll = forever wizard
+sampleFromMap :: Map.Map k a -> IO (k, a)
+sampleFromMap m = do
+    i <- applyAtomicGen (randomR (0, Map.size m - 1)) globalStdGen
+    pure $ Map.elemAt i m
+
+cumsum :: Num a => [a] -> (a, [a])
+cumsum = mapAccumL (\s x -> let s' = s + x in s' `seq` (s', s')) 0
+
+sampleWeighted :: (x -> Int) -> [x] -> IO x
+sampleWeighted weigh xs = do
+    k <- applyAtomicGen (randomR (0, totalWeight - 1)) globalStdGen
+    case Map.lookupGT k table of
+        Nothing -> error "impossible?"
+        Just (_,x) -> pure x
+    where
+      (totalWeight, ws) = cumsum (weigh <$> xs)
+      table = Map.fromList (zip ws xs)
+
+playMain :: (Collection Word i) => PlayDiff -> Set i -> IO ()
+playMain diff coll = forever wizard
   where
     wizard = do
         putStrLn "Let's play with bot!"
         loop coll
-
+    
     loop s = do
         putStrLn $ show (Set.size s) ++ " words remaining"
         i <- askQuery
         let nexts = outcomes i s
-            (resp, s') = maximumBy (comparing (Set.size . snd)) (Map.toList nexts)
+        (resp, s') <- chooser i nexts
         putStrLn $ "|@@|  " ++ V.toList (itemValue i) ++ "  |@@|"
         putStrLn $ "|@@|  " ++ printResp resp         ++ "  |@@|"
         if all (== Hit) resp
           then putStrLn "Good job!"
           else loop s'
+    
+    chooser x = case diff of
+        Easy -> sampleFromMap
+        Normal -> weightedChooser normalWeigh
+        Hard -> weightedChooser (devilsWeigh x)
+    
+    weightedChooser weigh nexts
+        | Map.size nexts == 0 = error "impossible?"
+        | Map.size nexts == 1 = pure $ Map.findMin nexts
+        | otherwise           = sampleWeighted weigh (Map.toList nexts)
+    normalWeigh (_,s) = Set.size s
+    devilsWeigh x (_,s) | s == Set.singleton x = 0
+                        | otherwise            = Set.size s ^ (3 :: Int)
     
     revWordMap = Map.fromList [ (itemValue i, i) | i <- Set.toList coll ]
     askQuery = promptMap "Enter the query> " (Just . V.fromList) revWordMap
