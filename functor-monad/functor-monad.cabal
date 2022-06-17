@@ -11,7 +11,7 @@ extra-source-files:  README.md
 library
   hs-source-dirs:  src
   exposed-modules: FFunctor, FMonad, FMonad.Compose, FMonad.FreeT, FMonad.State1, FMonad.Trail, ListTVia,
-                   Functor.Day.Curried
+                   Functor.Day.Curried, Control.Applicative.Trans.FreeAp, Data.Functor.Flip1
   build-depends:       base >= 4.10 && < 5
                      , transformers
                      , kan-extensions
