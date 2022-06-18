@@ -2,15 +2,26 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Control.Applicative.Trans.FreeAp where
+module Control.Applicative.Trans.FreeAp(
+    ApT(..),
 
-import Data.Functor.Day
-import Control.Applicative.Lift
+    ViewApT, viewApT, fromViewApT,
+
+    hoistApT, transApT,
+    liftF, liftT, appendApT,
+    
+    iterT, foldApT, 
+    fjoinApTLeft, fjoinApTRight
+) where
+
+import Data.Functor.Day ( Day(..) )
+import Control.Applicative.Lift ( Lift(..) )
 import Data.Function ((&))
 import Control.Applicative
-import FFunctor
+
 import Data.Functor.Flip1
-import FMonad
+import FFunctor ( FFunctor(..) )
+import FMonad ( FMonad(..) )
 
 -- | > ApT f g ~ g + (g ⊗ f ⊗ 'ApT' f g)
 --
@@ -73,6 +84,11 @@ liftT = PureT
 liftF :: Applicative g => f x -> ApT f g x
 liftF fx = ApT (pure ()) fx (pure ()) (\_ x _ -> x)
 
+appendApT :: ApT f g a -> f b -> ApT f g c -> (a -> b -> c -> x) -> ApT f g x
+appendApT prefix fb postfix x = case prefix of
+    PureT ga -> ApT ga fb postfix x
+    ApT ga' fb' prefix' a -> ApT ga' fb' (appendApT prefix' fb postfix (,,)) (\a' b' ~(c',b,c) -> x (a a' b' c') b c)
+
 iterT :: forall f g x. Applicative g => (forall a b c. (a -> b -> c) -> f a -> g b -> g c) -> ApT f g x -> g x
 iterT op = go
   where
@@ -87,8 +103,15 @@ foldApT f2h g2h = go
     go (PureT gx) = g2h gx
     go (ApT ga fb rc x) = liftA3 x (g2h ga) (f2h fb) (go rc)
 
-fjoinApT :: Applicative g => ApT (ApT f g) g x -> ApT f g x
-fjoinApT = foldApT id liftT
+fjoinApTLeft :: forall f g x. ApT f (ApT f g) x -> ApT f g x
+fjoinApTLeft = go
+  where
+    go :: forall y. ApT f (ApT f g) y -> ApT f g y
+    go (PureT inner) = inner
+    go (ApT inner fb rest y) = appendApT inner fb (go rest) y
+
+fjoinApTRight :: Applicative g => ApT (ApT f g) g x -> ApT f g x
+fjoinApTRight = foldApT id liftT
 
 instance FFunctor (ApT f) where
     ffmap = hoistApT

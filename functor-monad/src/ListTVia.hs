@@ -15,7 +15,7 @@ module ListTVia where
 
 import Data.Kind ( Type )
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.Free
+import Control.Monad.Trans.Free hiding (type FreeT())
 
 import Data.Monoid (Ap(..))
 
@@ -32,11 +32,11 @@ newtype ListT m a = ListT { runListT :: FreeT ((,) a) m () }
 
 -- MonadTrans is specific to ListT
 instance MonadTrans ListT where
-  lift ma = ListT . FreeT $ ma >>= \a -> return $ Free (a, return ())
+  lift ma = ListT . WrapFreeT . FreeT $ ma >>= \a -> return $ Free (a, return ())
 
 -- For test:
 collapse :: Monad m => ListT m () -> m ()
-collapse = iterT (\((), m) -> m) . runListT
+collapse = iterT (\((), m) -> m) . unwrapFreeT . runListT
 
 eval :: Show a => ListT IO a -> IO ()
 eval ma = collapse (ma >>= (lift . pr))
