@@ -47,5 +47,4 @@ foldFFree toMM = go
     go (FFree ftx) = fjoin (ffmap go (toMM ftx))
 
 retract :: (FMonad ff, Functor g) => FFree ff g ~> ff g
-retract (FPure gx) = fpure gx
-retract (FFree fmx) = fjoin (ffmap retract fmx)
+retract = foldFFree id
