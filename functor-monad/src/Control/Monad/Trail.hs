@@ -12,7 +12,7 @@
   TypeOperators,
   TupleSections
 #-}
-module FMonad.Trail(Trail(..)) where
+module Control.Monad.Trail(Trail(..)) where
 
 import Control.Monad (ap)
 import Data.Bifunctor

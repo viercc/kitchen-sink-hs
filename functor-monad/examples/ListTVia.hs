@@ -11,7 +11,7 @@
   TupleSections,
   QuantifiedConstraints
 #-}
-module ListTVia where
+module Main(main) where
 
 import Data.Kind ( Type )
 import Control.Monad.Trans.Class
@@ -20,7 +20,7 @@ import Control.Monad.Trans.Free hiding (type FreeT())
 import Data.Monoid (Ap(..))
 
 import FMonad.FreeT
-import FMonad.Trail
+import Control.Monad.Trail
 
 type    ListT :: (Type -> Type) -> (Type -> Type)
 newtype ListT m a = ListT { runListT :: FreeT ((,) a) m () }
@@ -35,15 +35,14 @@ instance MonadTrans ListT where
   lift ma = ListT . WrapFreeT . FreeT $ ma >>= \a -> return $ Free (a, return ())
 
 -- For test:
-collapse :: Monad m => ListT m () -> m ()
-collapse = iterT (\((), m) -> m) . unwrapFreeT . runListT
-
-eval :: Show a => ListT IO a -> IO ()
-eval ma = collapse (ma >>= (lift . pr))
-  where pr a = putStrLn $ "ValueProduced[" ++ show a ++ "]"
+forEach :: Monad m => ListT m a -> (a -> m ()) -> m ()
+forEach as f = iterT (\(a, m) -> f a >> m) . unwrapFreeT . runListT $ as
 
 test1, test2, test3 :: ListT IO Int
-test1 = lift (print "A") >> mempty
-test2 = lift (print "B") >> pure 1
-test3 = lift (print "C") >> (pure 2 <> pure 3)
+test1 = lift (putStrLn "SideEffect: A") >> mempty
+test2 = lift (putStrLn "SideEffect: B") >> pure 1
+test3 = lift (putStrLn "SideEffect: C") >> (pure 2 <> pure 3)
 
+main :: IO ()
+main = forEach test print
+  where test = (test1 <> test2 <> test3) >>= \n -> pure 100 <> pure n

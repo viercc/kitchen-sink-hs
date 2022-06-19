@@ -10,8 +10,12 @@ extra-source-files:  README.md
 
 library
   hs-source-dirs:  src
-  exposed-modules: FFunctor, FMonad, FMonad.Compose, FMonad.FreeT, FMonad.State1, FMonad.Trail, ListTVia,
-                   Control.Monad.Trans.Free.Extra, Control.Applicative.Trans.FreeAp, Data.Functor.Flip1
+  exposed-modules: FFunctor, FMonad, FMonad.Compose, FMonad.FreeT, FMonad.State1,
+                   Control.Monad.Trail,
+                   
+                   Control.Monad.Trans.Free.Extra,
+                   Control.Applicative.Trans.FreeAp,
+                   Data.Functor.Flip1
   build-depends:       base >= 4.10 && < 5
                      , transformers
                      , kan-extensions
@@ -19,3 +23,11 @@ library
   ghc-options:       -Wall -Wcompat
                      -Wunused-packages -Wwarn=unused-packages
   default-language:  Haskell2010
+
+test-suite functor-monad-examples
+  type:               exitcode-stdio-1.0
+  hs-source-dirs:     examples
+  main-is:            ListTVia.hs
+  build-depends:      base, transformers, free, functor-monad
+  ghc-options:        -Wall -Wwarn=unused-packages
+  default-language:   Haskell2010

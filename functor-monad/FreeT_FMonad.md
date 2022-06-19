@@ -51,7 +51,7 @@ class FFunctor ff => FMonad ff where
 
 ### FreeT'
 
-[FreeT'](./FMonad.hs#L382), cf. [FreeT](https://hackage.haskell.org/package/free-5.1.3/docs/Control-Monad-Trans-Free.html#t:FreeT)
+[FreeT'](./src/FMonad/FreeT.hs), cf. [FreeT](https://hackage.haskell.org/package/free-5.1.3/docs/Control-Monad-Trans-Free.html#t:FreeT)
 
 ```haskell
 -- FreeT' is (Flip FreeT)

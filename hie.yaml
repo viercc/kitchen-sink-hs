@@ -2,6 +2,9 @@ cradle:
   cabal:
     - path: "functor-monad/src"
       component: "lib:functor-monad"
+    
+    - path: "functor-monad/examples"
+      component: "test:functor-monad-examples"
 
     - path: "experiment/src"
       component: "lib:experiment"
