@@ -14,7 +14,7 @@ import Control.Arrow ((>>>))
 -- Sadly, Functor (FreeT m f) uses liftM instead of fmap,
 -- meaning (Monad m, Functor f) => Functor (FreeT f m).
 -- Maybe that was for backward compatibility,
--- but I want (Functor m, Functor f) => ...
+-- but I want (Functor f, Functor m) => ...
 fmapFreeT_ :: (Functor f, Functor m) => (a -> b) -> FreeT f m a -> FreeT f m b
 fmapFreeT_ f = let go = FreeT . fmap (bimap f go) . runFreeT in go
 
