@@ -50,6 +50,7 @@ library
                      , semialign
                      , rank2classes
                      , these
+                     , type-natural
                      , finite-typelits
                      , finitary
                      , partial-semigroup
