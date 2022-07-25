@@ -11,30 +11,35 @@ extra-source-files:  README.md
 
 library
   hs-source-dirs:  src
-  exposed-modules: AdHocInstances, AdditionChain, Cardinality,
-                   CheapRecord, CoerceUnder, DifferenceApplicative,
-                   Distributive, Eyes,
-
-                   Heap, HeytingApplicative, HMatchable, Hoard,
+  exposed-modules: AdHocInstances,Heap, 
+                   Newtypes, CheapRecord, CoerceUnder,
+                   LCS,
+                   
+                   AdditionChain, Cardinality,
                    KrohnRhodes,
-                   
-                   LCS, MonoidalOnPartial,
-                   Newtypes,
-                   
                    Ordinal,
-                   PartialMonad, PartialMonoid,
-                   Poifree,
-                   Polynomial,
 
-                   PrismSelective,
-                   PureSet,
+                   DifferenceApplicative,
+                   Distributive,
+
+                   HeytingApplicative, HMatchable, Hoard,
                    Rank2Unzip,
+                   
+                   Partial.Monad,
+                   Partial.Monoidal,
+                   Partial.Poifree,
 
-                   Selective2,
-                   SetExtra,
+                   TheseChain,
+
+                   Selective.Prism, Selective.Night,
+
+                   Data.Set.Extra, PureSet,
+
                    TreesThatGrow,
 
-                   Isomorphisms, Isomorphisms2
+                   Isomorphisms, Isomorphisms2,
+
+                   Data.Finite.Extra, Polynomial
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection

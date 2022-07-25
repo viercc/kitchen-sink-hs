@@ -1,4 +1,4 @@
-module Poifree where
+module Partial.Poifree where
 
 import Data.Bifunctor
 import Control.Monad

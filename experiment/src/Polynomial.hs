@@ -6,7 +6,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE DataKinds #-}
@@ -21,23 +20,31 @@ import GHC.TypeNats
 import Data.Finite
 import Data.Finitary
 import Data.Type.Natural
-import Finite.Extra (absurdFinite, shiftSRight, weakenS)
+import Data.Finite.Extra (absurdFinite, shiftSRight, weakenS)
 
+-- | Uniformly represented polynomial functor.
 type Poly :: (Nat -> Type) -> Type -> Type
 data Poly tag x where
   P :: tag n -> (Finite n -> x) -> Poly tag x
 
 deriving instance Functor (Poly tag)
 
+-- | @'HasSNat' t@ indicates @t n@ contains sufficient data
+--   to construct the @'SNat' n@ value.
+--   
+--   Here, @t@ represents a function @α :: U -> Nat@ on some type @U@.
+--   A value @x :: t n@ corresponds to a member of @x' :: U@ such that @α x' = n@.
 class HasSNat t where
   toSNat :: t n -> SNat n
 
-class (HasSNat (Tag f)) => Polynomial f where
+-- | A class for polynomial 'Functor's @f@ 
+class (Functor f, HasSNat (Tag f)) => Polynomial f where
   type family Tag f :: Nat -> Type
   
   toPoly :: f x -> Poly (Tag f) x
   fromPoly :: Poly (Tag f) x -> f x
 
+-- | @NatEq n@ represents a singleton set equipped with constant function @α = const n :: () -> Nat@
 data NatEq n m where
   NRefl :: KnownNat n => NatEq n n
 
@@ -50,20 +57,24 @@ instance Finitary r => Polynomial ((->) r) where
   toPoly f = P NRefl (f . fromFinite)
   fromPoly (P NRefl f) r = f (toFinite r)
 
+-- | Any empty set have a unique \"function\" @α = absurd :: ∅ -> Nat@
 instance HasSNat V1 where
   toSNat = absurdV1
-
-absurdV1 :: V1 a -> any
-absurdV1 v1 = case v1 of
 
 instance Polynomial V1 where
   type Tag V1 = V1
   toPoly = absurdV1
   fromPoly (P tag _)= absurdV1 tag
 
-type TagK :: k -> Nat -> Type
+absurdV1 :: V1 a -> b
+absurdV1 v1 = case v1 of { }
+
+-- | @TagK c n@ represents a constant function @α = const n :: c -> Nat@
+type TagK :: Type -> Nat -> Type
 data TagK c n where
   TagK :: c -> TagK c 0
+
+deriving instance Eq c => Eq (TagK c n)
 
 instance HasSNat (TagK c) where
   toSNat (TagK _) = sZero
@@ -101,6 +112,8 @@ instance (Polynomial f, Polynomial g) => Polynomial (f :+: g) where
   fromPoly (P (L1 tag) rep) = L1 (fromPoly (P tag rep))
   fromPoly (P (R1 tag) rep) = R1 (fromPoly (P tag rep))
 
+-- | When @f@ represents @(U,α :: U -> Nat)@ and @g@ represents @(V,β :: V -> Nat)@,
+--   @TagMul f g x@ represents @((U,V), \(u,v) -> α u + β v)@.
 data TagMul f g x where
   TagMul :: !(f x) -> !(g y) -> TagMul f g (x + y)
 
@@ -122,6 +135,10 @@ instance (Polynomial f, Polynomial g) => Polynomial (f :*: g) where
         pg = P tagG (rep . shiftSRight n1 n2)
     in fromPoly pf :*: fromPoly pg
 
+-- | When @f@ represents @(U,α :: U -> Nat)@,
+--   @TagPow n f xs@ represents @(U^n, \(u1,u2, ..., u_n) -> α u1 + α u2 + ... + α u_n)@.
+--   
+--   In other words, @TagPow n f@ is equivalent to @f `TagMul` f `TagMul` ...(n times)... `TagMul` f@.
 data TagPow n f xs where
   PowZeroTag :: TagPow 0 f 0
   PowSuccTag :: !(TagPow n f xs) -> !(f x) -> !(SNat (xs + x)) -> TagPow (n + 1) f (xs + x)
@@ -130,9 +147,11 @@ instance (HasSNat f) => HasSNat (TagPow n f) where
   toSNat PowZeroTag = sZero
   toSNat (PowSuccTag _ _ n) = n
 
+-- | @Pow n f x = (f x, f x, ... (product of /n/ (f x)) ... , f x)@
 data Pow n f x = Pow !(SNat n) (Finite n -> f x)
 deriving instance Functor f => Functor (Pow n f)
 
+-- | Destruct @Pow n f x@ one by one.
 data PowView n f x where
   PowZero :: PowView 0 f x
   PowSucc :: Pow n f x -> f x -> PowView (n + 1) f x

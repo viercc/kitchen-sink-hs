@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
-module PrismSelective where
+module Selective.Prism where
 
 import Data.Bifunctor
 import Control.Selective

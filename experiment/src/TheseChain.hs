@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE LambdaCase #-}
-module ThesePair where
+module TheseChain where
 
 import Data.These (These(..))
 

@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Finite.Extra (absurdFinite, weakenS, shiftS, shiftSRight, strengthenWithS) where
+module Data.Finite.Extra (absurdFinite, weakenS, shiftS, shiftSRight, strengthenWithS) where
 
 import Data.Type.Equality (type  (:~:) (Refl))
 import Data.Proxy

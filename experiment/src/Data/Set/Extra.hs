@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
-module SetExtra (symdiff, symdiffSlow) where
+module Data.Set.Extra (symdiff, symdiffSlow) where
 
 import GHC.Exts(reallyUnsafePtrEquality#, isTrue#)
 import Data.Set.Internal ( Set(..), splitMember, link, merge )
