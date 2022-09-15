@@ -57,3 +57,9 @@ executable unzip-fmap
   main-is: unzip-test.hs
   cpp-options: -DUNZIP_FUNCTION=unzipFunctor
 
+executable readwrite
+  import: ghcopt
+  hs-source-dirs: readwrite
+  build-depends:  base >= 4.10, process
+  main-is: readwrite.hs
+

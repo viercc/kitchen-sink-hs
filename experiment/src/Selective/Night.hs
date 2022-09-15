@@ -12,7 +12,7 @@ https://www.reddit.com/r/haskell/comments/axje88/selective_applicative_functors/
 {-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveFunctor #-}
-module Selective2 where
+module Selective.Night where
 
 import Prelude hiding ((.), id)
 import Control.Category

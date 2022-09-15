@@ -26,13 +26,13 @@ module PureSet(
 import Prelude hiding (null)
 
 import qualified Data.Set as D
+import qualified Data.Set.Extra as D
 
 import Data.Bits
 import Data.Word(Word64)
 import Data.List (foldl', intersperse)
 import Numeric.Natural ( Natural )
 import Math.NumberTheory.Logarithms ( naturalLog2 )
-import qualified SetExtra
 import qualified GHC.Exts as Ext
 import Data.Maybe (isNothing)
 
@@ -106,7 +106,7 @@ difference :: Set -> Set -> Set
 difference (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.difference xlarge ylarge) (x .&. complement y)
 
 symdiff :: Set -> Set -> Set
-symdiff (MkSet xlarge x) (MkSet ylarge y) = MkSet (SetExtra.symdiff xlarge ylarge) (x `xor` y)
+symdiff (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.symdiff xlarge ylarge) (x `xor` y)
 
 toAscList :: Set -> [Set]
 toAscList (MkSet xlarge x) = [ MkSet D.empty (fromIntegral i) | i <- bitAscList x ] ++ D.toAscList xlarge
