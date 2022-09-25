@@ -21,7 +21,7 @@ import WordleAppCommons
 
 import System.Random.Stateful
 
-data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff
+data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff | AnalyseMode FilePath
 
 data PlayDiff = Easy | Normal | Hard
 
@@ -44,6 +44,7 @@ parseArgs args = case args of
         ("--normal" : rest') -> (PlayMode inFile Normal, rest')
         ("--hard" : rest') -> (PlayMode inFile Hard, rest')
         _ -> (HelpMode, rest)
+    "--analyse" : inFile : rest -> (AnalyseMode inFile, rest)
     rest -> (HelpMode, rest)
 
 readWordListFileWithMsg :: FilePath -> IO (V.Vector Word)
@@ -61,6 +62,7 @@ main = do
         InitMode inFile outFile -> initMode inFile outFile
         InteractiveMode inFile -> interactiveMode inFile
         PlayMode inFile difficulty -> playMode inFile difficulty
+        AnalyseMode inFile -> analyseMode inFile
 
 printHelp :: IO ()
 printHelp = putStrLn $
@@ -68,7 +70,8 @@ printHelp = putStrLn $
     "\t--help\n" ++
     "\t--init inFile outFile\n" ++
     "\t--solver inFile\n" ++
-    "\t--play inFile [--easy | --normal | --hard]    (default: --normal) \n"
+    "\t--play inFile [--easy | --normal | --hard]    (default: --normal) \n" ++
+    "\t--analyse inFile\n"
 
 initMode :: FilePath -> FilePath -> IO ()
 initMode inFile outFile = do
@@ -180,3 +183,16 @@ playMain diff coll = forever wizard
     
     revWordMap = Map.fromList [ (itemValue i, i) | i <- Set.toList coll ]
     askQuery = promptMap "Enter the query> " (Just . V.fromList) revWordMap
+
+analyseMode :: FilePath -> IO ()
+analyseMode inFile = do
+    ws <- readWordListFileWithMsg inFile
+    withCollection ws analyseMain
+
+analyseMain :: Collection Word i => Set i -> IO ()
+analyseMain allWords = putStrLn . ppr $ gameTree
+  where
+    ppr = prettyPrintGameTree (V.toList . itemValue) printResp
+    allGameTree = completeGame allWords
+    
+    gameTree = pruneContinues $ winsInNTurns 3 $ Continues <$ allGameTree
