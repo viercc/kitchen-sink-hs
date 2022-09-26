@@ -29,3 +29,6 @@ cradle:
 
     - path: "nerdle/app"
       component: "exe:wordle-solver"
+
+    - path: "graph-chart/app"
+      component: "exe:graph-chart"

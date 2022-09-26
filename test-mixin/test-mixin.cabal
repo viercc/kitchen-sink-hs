@@ -4,7 +4,6 @@ version:             0.1.0.0
 author:              Koji Miyazato
 maintainer:          viercc@gmail.com
 build-type:          Simple
-extra-source-files:  CHANGELOG.md
 
 executable test-mixin
   main-is:             Main.hs
