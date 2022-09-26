@@ -272,6 +272,8 @@ analyseMain lookAheads allWords = do
     
     prettyChildren d xs resps =
         for_ (Map.toList resps) $ \(r, s) -> do
-            prettyTree d (printResp r ++ " ---> ") xs s
+            if all (== Hit) r
+                then return ()
+                else prettyTree d (printResp r ++ " ---> ") xs s
 
     indent d = replicate (2*d) ' '

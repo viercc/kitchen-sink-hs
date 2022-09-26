@@ -9,7 +9,6 @@ module Search(outcomes, Score, scoreRespBy,
 import Prelude hiding (Word)
 
 import Data.Ord (comparing)
-import Data.Bifunctor
 import Data.Foldable
 import Data.List (sortBy)
 
@@ -25,9 +24,7 @@ import Types
 import Util
 
 outcomes :: Collection Word i => i -> Set i -> Map Resp (Set i)
-outcomes x ys
-  | ys == Set.singleton x = Map.singleton (resp x) (Set.singleton x)
-  | otherwise             = Map.fromListWith Set.union [ (resp y, Set.singleton y) | y <- Set.toList ys, y /= x ]
+outcomes x ys = Map.fromListWith Set.union [ (resp y, Set.singleton y) | y <- Set.toList ys ]
   where
     resp y = response (itemValue y) xWord
     xWord = itemValue x
@@ -50,16 +47,14 @@ scoreRespBy f x resps
     isAnswer = Map.elems resps == [Set.singleton x]
 
 minmaxSizeStrategy :: forall i. Collection Word i => [i] -> Set i -> ([i], i)
-minmaxSizeStrategy xs ys = second head $ minmaxSizeStrategyAll xs ys
-
-minmaxSizeStrategyAll :: forall i. Collection Word i => [i] -> Set i -> ([i], [i])
-minmaxSizeStrategyAll xs ys
-  | Set.size ys <= 1 = ([], [Set.findMin ys])
-  | otherwise        = xs' `listSeq` (xs', winners)
+minmaxSizeStrategy xs ys
+  | Set.size ys <= 1 = ([], Set.findMin ys)
+  | otherwise        = xs' `listSeq` (xs', winner)
   where
     results = [ (x, scoreRespBy Set.size x resps) | (x, resps) <- allEffectiveMoves xs ys ]
     xs' = map fst results
-    winners = map fst $ minimumGroupBy (comparing snd) results
+    isNotAnswer x = Set.notMember x ys
+    winner = fst $ minimumBy (comparing snd <> comparing (isNotAnswer . fst)) results
 
 lookAheadScore :: forall i. (Collection Word i) => i -> [i] -> Map Resp (Set i) -> (Score, Score)
 lookAheadScore x xs' resps = (nextScore, currentScore)
@@ -76,7 +71,8 @@ lookAheadStrategy xs ys
     children = allEffectiveMoves xs ys
     xs' = map fst children
     results2 = [ (x, lookAheadScore x xs' resp) | (x, resp) <- children ]
-    winner = fst $ minimumBy (comparing snd) results2
+    isNotAnswer x = Set.notMember x ys
+    winner = fst $ minimumBy (comparing snd <> comparing (isNotAnswer . fst)) results2
 
 recursionWidth :: Int
 recursionWidth = 10
@@ -97,7 +93,8 @@ recursiveDeepBranch xs ys
     y0 = Set.findMin ys
     results = [ (x, scoreRespBy Set.size x resp) | (x, resp) <- allEffectiveMoves xs ys ]
     xs' = map fst results
-    candidates = map fst $ take recursionWidth $ sortBy (comparing snd) results
+    isNotAnswer x = Set.notMember x ys
+    candidates = map fst $ take recursionWidth $ sortBy (comparing snd <> comparing (isNotAnswer . fst)) results
 
 winsIn :: forall i. Collection Word i => Int -> [i] -> i -> Set i -> Bool
 winsIn 0 _ x ys = ys == Set.singleton x
