@@ -21,9 +21,10 @@ import WordleAppCommons
 
 import System.Random.Stateful
 
-data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff | AnalyseMode FilePath
+data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff | AnalyseMode AnalysisType FilePath
 
 data PlayDiff = Easy | Normal | Hard
+data AnalysisType = NoLookAhead | LookAhead | Deep
 
 getOption :: IO Option
 getOption =
@@ -44,7 +45,9 @@ parseArgs args = case args of
         ("--normal" : rest') -> (PlayMode inFile Normal, rest')
         ("--hard" : rest') -> (PlayMode inFile Hard, rest')
         _ -> (HelpMode, rest)
-    "--analyse" : inFile : rest -> (AnalyseMode inFile, rest)
+    "--analyse" : "--lookahead" : inFile : rest -> (AnalyseMode LookAhead inFile, rest)
+    "--analyse" : "--deep" : inFile : rest -> (AnalyseMode Deep inFile, rest)
+    "--analyse" : inFile : rest -> (AnalyseMode NoLookAhead inFile, rest)
     rest -> (HelpMode, rest)
 
 readWordListFileWithMsg :: FilePath -> IO (V.Vector Word)
@@ -62,7 +65,7 @@ main = do
         InitMode inFile outFile -> initMode inFile outFile
         InteractiveMode inFile -> interactiveMode inFile
         PlayMode inFile difficulty -> playMode inFile difficulty
-        AnalyseMode inFile -> analyseMode inFile
+        AnalyseMode lookAheads inFile -> analyseMode lookAheads inFile
 
 printHelp :: IO ()
 printHelp = putStrLn $
@@ -71,7 +74,7 @@ printHelp = putStrLn $
     "\t--init inFile outFile\n" ++
     "\t--solver inFile\n" ++
     "\t--play inFile [--easy | --normal | --hard]    (default: --normal) \n" ++
-    "\t--analyse inFile\n"
+    "\t--analyse [--lookahead] inFile\n"
 
 initMode :: FilePath -> FilePath -> IO ()
 initMode inFile outFile = do
@@ -83,14 +86,14 @@ initMode inFile outFile = do
         for_ ws' $ \w -> hPutStrLn out (toList w)
 
 sortByHeuristic :: Collection Word i => Set i -> [Word]
-sortByHeuristic coll = map itemValue $ sortOn (\x -> fst (maxSizeScore x coll)) $ Set.toList universe
+sortByHeuristic coll = map itemValue $ sortOn (\x -> scoreRespBy Set.size x (outcomes x coll)) $ Set.toList universe
 
 interactiveMode :: FilePath -> IO ()
 interactiveMode inFile = do
     ws <- readWordListFileWithMsg inFile
     withCollection ws interactiveMain
 
-interactiveMain :: (Collection Word i) => Set i -> IO ()
+interactiveMain :: forall i. (Collection Word i) => Set i -> IO ()
 interactiveMain coll = forever wizard
   where
     initialRecommend = Set.findMin coll
@@ -103,9 +106,12 @@ interactiveMain coll = forever wizard
         s <- askResp nexts
         loop s
 
+    allWords = Set.toList universe :: [i]
+
     loop s = do
         describeCandidates s
-        let (recommend, nexts) = minmaxSizeStrategy s
+        let (_, recommend) = minmaxSizeStrategy allWords s
+            nexts = outcomes recommend s
         if Map.null nexts
           then putStrLn $ "Answer: " ++ show (itemValue recommend)
           else do
@@ -184,15 +190,37 @@ playMain diff coll = forever wizard
     revWordMap = Map.fromList [ (itemValue i, i) | i <- Set.toList coll ]
     askQuery = promptMap "Enter the query> " (Just . V.fromList) revWordMap
 
-analyseMode :: FilePath -> IO ()
-analyseMode inFile = do
+analyseMode :: AnalysisType -> FilePath -> IO ()
+analyseMode la inFile = do
     ws <- readWordListFileWithMsg inFile
-    withCollection ws analyseMain
+    withCollection ws (analyseMain la)
 
-analyseMain :: Collection Word i => Set i -> IO ()
-analyseMain allWords = putStrLn . ppr $ gameTree
+showWordItem :: Collection Word i => i -> String
+showWordItem = V.toList . itemValue
+
+analyseMain :: Collection Word i => AnalysisType -> Set i -> IO ()
+analyseMain lookAheads allWords = do
+    putStrLn $ strategyName ++ " strategy"
+    prettyTree 0 "" (Set.toList allWords) allWords
   where
-    ppr = prettyPrintGameTree (V.toList . itemValue) printResp
-    allGameTree = completeGame allWords
+    strategy = case lookAheads of
+        NoLookAhead -> minmaxSizeStrategy
+        LookAhead -> lookAheadStrategy
+        Deep -> recursiveDeepStrategy
+    strategyName = case lookAheads of
+        NoLookAhead -> "Single"
+        LookAhead -> "LookAhead"
+        Deep -> "Deep"
     
-    gameTree = pruneContinues $ winsInNTurns 3 $ Continues <$ allGameTree
+    prettyTree d prefix xs ys =
+      do let (xs', x) = strategy xs ys
+         putStrLn $ indent d ++ prefix ++ showWordItem x
+         if Set.size ys > 1
+           then prettyChildren (d+1) xs' (outcomes x ys)
+           else return ()
+    
+    prettyChildren d xs resps =
+        for_ (Map.toList resps) $ \(r, s) -> do
+            prettyTree d (printResp r ++ " ---> ") xs s
+
+    indent d = replicate (2*d) ' '
