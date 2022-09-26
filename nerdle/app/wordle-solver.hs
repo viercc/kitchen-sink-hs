@@ -9,17 +9,21 @@ import Data.List (sortOn, mapAccumL)
 
 import System.IO
 import System.Environment (getArgs)
+import System.Exit (exitFailure)
 
+import Data.Map (Map)
+import qualified Data.Map.Lazy as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Data.Map.Lazy as Map
 import qualified Data.Vector as V
+
+import System.Random.Stateful
 
 import Collection
 import WordleLike ( Response(..) )
-import WordleAppCommons
 
-import System.Random.Stateful
+import Types
+import Search
 
 data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff | AnalyseMode AnalysisType FilePath
 
@@ -50,6 +54,36 @@ parseArgs args = case args of
     "--analyse" : inFile : rest -> (AnalyseMode NoLookAhead inFile, rest)
     rest -> (HelpMode, rest)
 
+readWordListFile :: FilePath -> IO [Word]
+readWordListFile fileName = do
+    wordTxt <- readFile' fileName
+    let ws = map V.fromList $ filter (not . null) (lines wordTxt)
+    case ws of
+        [] -> hPutStrLn stderr "Empty word list!" >> exitFailure
+        w:ws' | all (\v -> length w == length v) ws' -> pure ws
+              | otherwise                            -> hPutStrLn stderr "Word length varies!" >> exitFailure
+
+promptInteract :: String -> (String -> Either String a) -> IO a
+promptInteract msg reader = loop
+  where
+    loop =
+      do putStr msg
+         hFlush stdout
+         s <- getLine
+         case reader s of
+          Left errMsg -> putStrLn errMsg >> loop
+          Right a -> pure a
+
+readByMap :: (Ord k) => (String -> Maybe k) -> Map k a -> String -> Either String a
+readByMap reader dict s = case reader s of
+      Nothing -> Left "No parse (try again)"
+      Just k -> case Map.lookup k dict of
+          Nothing -> Left "Key not found (try again)"
+          Just a  -> Right a
+
+promptMap :: (Ord k) => String -> (String -> Maybe k) -> Map k a -> IO a
+promptMap msg reader dict = promptInteract msg (readByMap reader dict)
+
 readWordListFileWithMsg :: FilePath -> IO (V.Vector Word)
 readWordListFileWithMsg inFile = do
     ws <- readWordListFile inFile
@@ -74,7 +108,7 @@ printHelp = putStrLn $
     "\t--init inFile outFile\n" ++
     "\t--solver inFile\n" ++
     "\t--play inFile [--easy | --normal | --hard]    (default: --normal) \n" ++
-    "\t--analyse [--lookahead] inFile\n"
+    "\t--analyse [--lookahead | --deep] inFile\n"
 
 initMode :: FilePath -> FilePath -> IO ()
 initMode inFile outFile = do
@@ -93,45 +127,65 @@ interactiveMode inFile = do
     ws <- readWordListFileWithMsg inFile
     withCollection ws interactiveMain
 
+data SolverCommand a = SolverUndo | SolverReset | SolverQuery a
+
+readCmdByMap :: (Ord k) => (String -> Maybe k) -> Map.Map k a -> String -> Either String (SolverCommand a)
+readCmdByMap reader dict s = case readByMap reader dict s of
+    Left errMsg -> case s of
+        "/undo" -> Right SolverUndo
+        "/reset" -> Right SolverReset
+        _ -> Left errMsg
+    Right a -> Right (SolverQuery a)
+
 interactiveMain :: forall i. (Collection Word i) => Set i -> IO ()
-interactiveMain coll = forever wizard
+interactiveMain coll = banner >> forever wizard
   where
     initialRecommend = Set.findMin coll
     
-    wizard = do
-        describeCandidates coll
-        putStrLn $ "Recommend: " ++ show (itemValue initialRecommend)
-        i <- askQuery
-        let nexts = outcomes i coll
-        s <- askResp nexts
-        loop s
+    banner = do
+        putStrLn "Follow the wizard to solve a puzzle."
+        putStrLn "Input responses in the following form:"
+        putStrLn "  Hit: \'#\',  Blow: \'?\', Miss: \'.\'"
+        putStrLn "E.g. To enter Miss-Miss-Hit-Blow-Miss response, input ..#?."
+        putStrLn ""
+        putStrLn "Command: /undo to go back to the previous turn"
+        putStrLn "         /reset to return to the beginning"
+
+    wizard = loop (coll, initialRecommend) []
 
     allWords = Set.toList universe :: [i]
-
-    loop s = do
-        describeCandidates s
-        let (_, recommend) = minmaxSizeStrategy allWords s
-            nexts = outcomes recommend s
-        if Map.null nexts
-          then putStrLn $ "Answer: " ++ show (itemValue recommend)
-          else do
-            putStrLn $ "Recommend: " ++ show (itemValue recommend)
-            i <- askQuery
-            if i == recommend
-              then do s' <- askResp nexts
-                      loop s'
-              else do s' <- askResp (outcomes i s)
-                      loop s'
     
+    loop (s,recommend) undoStack
+      | Set.size s <= 1 = putStrLn $ "Answer: " ++ show (itemValue recommend)
+      | otherwise = do
+        describeCandidates s
+        putStrLn $ "Recommend: " ++ show (itemValue recommend)
+        iCmd <- askQuery
+        case iCmd of
+          SolverUndo -> undo undoStack
+          SolverReset -> reset
+          SolverQuery i -> do
+            respCmd <- askResp (outcomes i s)
+            case respCmd of
+              SolverUndo -> undo undoStack
+              SolverReset -> reset
+              SolverQuery s' ->
+                let (_,recommend') = minmaxSizeStrategy allWords s'
+                in loop (s', recommend') ((s, recommend) : undoStack)
+    
+    reset = putStrLn "Return to the start of the game..." >> wizard
+    undo []              = reset
+    undo (sr:undoStack') = putStrLn "Return to the previous turn..." >> loop sr undoStack'
+
     revWordMap = Map.fromList [ (itemValue i, i) | i <- Set.toList coll ]
-    askQuery = promptMap "Enter the query> " (Just . V.fromList) revWordMap
-    askResp = promptMap "Enter the response ([Miss,Blow,Hit] = [.,?,#] resp.)> " readResp
+    askQuery  = promptInteract "Enter the query >>>> " (readCmdByMap (Just . V.fromList) revWordMap)
+    askResp r = promptInteract "Enter the response > " (readCmdByMap readResp r)
 
     describeCandidates s
       | Set.size s <= 5 = putStrLn numMsg >>
                           for_ s (print . itemValue)
       | otherwise       = putStrLn numMsg
-      where numMsg = show (Set.size s) ++ " candidates remaining:"
+      where numMsg = show (Set.size s) ++ " words remaining"
 
 playMode :: FilePath -> PlayDiff -> IO ()
 playMode inFile diff = do
@@ -194,9 +248,6 @@ analyseMode :: AnalysisType -> FilePath -> IO ()
 analyseMode la inFile = do
     ws <- readWordListFileWithMsg inFile
     withCollection ws (analyseMain la)
-
-showWordItem :: Collection Word i => i -> String
-showWordItem = V.toList . itemValue
 
 analyseMain :: Collection Word i => AnalysisType -> Set i -> IO ()
 analyseMain lookAheads allWords = do
