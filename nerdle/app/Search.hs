@@ -3,14 +3,14 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE BangPatterns #-}
 module Search(outcomes, Score, scoreRespBy,
-  minmaxSizeStrategy, lookAheadStrategy, recursiveDeepStrategy
+  minmaxSizeStrategy, heuristicStrategy, perfectStrategy
 ) where
 
 import Prelude hiding (Word)
 
 import Data.Ord (comparing)
 import Data.Foldable
-import Data.List (sortBy)
+import Data.List (sortBy, partition)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -29,12 +29,25 @@ outcomes x ys = Map.fromListWith Set.union [ (resp y, Set.singleton y) | y <- Se
     resp y = response (itemValue y) xWord
     xWord = itemValue x
 
-isEffective :: Ord i => i -> Set i -> Map Resp (Set i) -> Bool
-isEffective x ys resps = x `Set.member` ys || Map.size resps > 1
+isWinningResp :: Map Resp s -> Bool
+isWinningResp m = Map.size m == 1 && all (==Hit) (fst (Map.findMin m))
 
-allEffectiveMoves :: Collection Word i => [i] -> Set i -> [(i, Map Resp (Set i))]
-allEffectiveMoves xs ys =
-  [ (x, resps) | x <- xs, let resps = outcomes x ys, isEffective x ys resps ]
+trimMoves :: Collection Word i => [i] -> Set i -> [i]
+trimMoves xs ys = xsAns ++ filter isEffective xsNonAns
+  where
+    (xsAns, xsNonAns) = partition (`Set.member` ys) xs
+    isEffective x = case Set.minView ys of
+          Nothing -> True
+          Just (y0, ys') -> let r0 = resp y0 in all (\y -> resp y == r0) ys'
+      where
+        resp y = response (itemValue x) (itemValue y)
+
+effectiveMoves :: Collection Word i => [i] -> Set i -> [(i, Map Resp (Set i))]
+effectiveMoves xs ys = 
+  [ (x, resps) | x <- xsAns, let resps = outcomes x ys ] ++
+  [ (x, resps) | x <- xsNonAns, let resps = outcomes x ys, Map.size resps > 1 ]
+  where
+    (xsAns, xsNonAns) = partition (`Set.member` ys) xs
 
 -- Score (smaller is better)
 type Score = Int
@@ -51,55 +64,58 @@ minmaxSizeStrategy xs ys
   | Set.size ys <= 1 = ([], Set.findMin ys)
   | otherwise        = xs' `listSeq` (xs', winner)
   where
-    results = [ (x, scoreRespBy Set.size x resps) | (x, resps) <- allEffectiveMoves xs ys ]
+    results = [ (x, score) | (x, resp) <- effectiveMoves xs ys, let !score = scoreRespBy Set.size x resp ]
     xs' = map fst results
-    isNotAnswer x = Set.notMember x ys
-    winner = fst $ minimumBy (comparing snd <> comparing (isNotAnswer . fst)) results
+    winner = fst $ minimumBy (comparing snd) results
 
-lookAheadScore :: forall i. (Collection Word i) => i -> [i] -> Map Resp (Set i) -> (Score, Score)
-lookAheadScore x xs' resps = (nextScore, currentScore)
+winsIn :: (a -> [b]) -> (b -> [a]) -> Int -> a -> Bool
+winsIn opponent player = opponentTurn
   where
-    currentScore = scoreRespBy Set.size x resps
-    nextScore = scoreRespBy nextStateScore x resps
-    nextStateScore ys' = minimum [ scoreRespBy Set.size x' resps' | (x', resps') <- allEffectiveMoves xs' ys' ]
+    opponentTurn n a = n > 0 && all (playerTurn n) (opponent a)
+    playerTurn n a = any (opponentTurn (n-1)) (player a)
 
-lookAheadStrategy :: forall i. (Collection Word i) => [i] -> Set i -> ([i], i)
-lookAheadStrategy xs ys
-  | Set.size ys <= 1 = ([], Set.findMin ys)
-  | otherwise        = xs' `listSeq` (xs', winner)
-  where
-    children = allEffectiveMoves xs ys
-    xs' = map fst children
-    results2 = [ (x, lookAheadScore x xs' resp) | (x, resp) <- children ]
-    isNotAnswer x = Set.notMember x ys
-    winner = fst $ minimumBy (comparing snd <> comparing (isNotAnswer . fst)) results2
+respOpponent :: Collection Word i => ([i], Map Resp (Set i)) -> [([i], Set i)]
+respOpponent (xs, resp)
+  | isWinningResp resp = []
+  | otherwise          = [ (xs, ys') | ys' <- Map.elems resp ]
 
-recursionWidth :: Int
-recursionWidth = 10
-
-recursiveDeepStrategy :: forall i. Collection Word i => [i] -> Set i -> ([i], i)
-recursiveDeepStrategy xs ys
+perfectStrategy :: forall i. Collection Word i => [i] -> Set i -> ([i], i)
+perfectStrategy xs ys
   | Set.size ys <= 1 = ([], Set.findMin ys)
   | otherwise        = (xs', winner)
   where
-    (xs', candidates) = recursiveDeepBranch xs ys
-    winner = head [ x | maxDepth <- [1 .. ], x <- candidates, winsIn maxDepth xs x ys ]
+    xs' = trimMoves xs ys
+    winner = head [ x | maxDepth <- [1 .. ], x <- xs', winsIn' maxDepth (xs', outcomes x ys) ]
+    winsIn' = winsIn respOpponent perfectPlayer
 
-recursiveDeepBranch :: forall i. Collection Word i => [i] -> Set i -> ([i], [i])
-recursiveDeepBranch xs ys
-   | Set.size ys == 1 = ([y0], [y0])
-   | otherwise        = xs' `listSeq` (xs', candidates)
+heuristicBranch :: forall i. Collection Word i => Int -> [i] -> Set i -> ([i], [i])
+heuristicBranch width xs ys = (xs', candidates)
+  where
+    results = [ (x, score) | (x, resp) <- effectiveMoves xs ys, let !score = scoreRespBy Set.size x resp ]
+    xs' = map fst results
+    candidates = map fst $ take width $ sortBy (comparing snd) results
+
+heuristicStrategy :: forall i. Collection Word i => Int -> [i] -> Set i -> ([i], i)
+heuristicStrategy width xs ys
+  | Set.size ys <= 1 = ([], Set.findMin ys)
+  | otherwise        = (xs', winner)
+  where
+    (xs', candidates) = heuristicBranch width xs ys
+    winner = head [ x | maxDepth <- [1 .. ], x <- candidates, winsIn' maxDepth (xs', outcomes x ys) ]
+    winsIn' = winsIn respOpponent (heuristicPlayer width)
+
+heuristicPlayer :: Collection Word i => Int -> ([i], Set i) -> [([i], Map Resp (Set i))]
+heuristicPlayer width (xs, ys)
+   | Set.size ys == 1 = [([y0], outcomes y0 ys)]
+   | otherwise        = xs' `listSeq` [ (xs', outcomes x ys) | x <- candidates ]
   where
     y0 = Set.findMin ys
-    results = [ (x, scoreRespBy Set.size x resp) | (x, resp) <- allEffectiveMoves xs ys ]
-    xs' = map fst results
-    isNotAnswer x = Set.notMember x ys
-    candidates = map fst $ take recursionWidth $ sortBy (comparing snd <> comparing (isNotAnswer . fst)) results
+    (xs', candidates) = heuristicBranch width xs ys
 
-winsIn :: forall i. Collection Word i => Int -> [i] -> i -> Set i -> Bool
-winsIn 0 _ x ys = ys == Set.singleton x
-winsIn n xs x ys = ys == Set.singleton x || all subStep (outcomes x ys)
+perfectPlayer :: Collection Word i => ([i], Set i) -> [([i], Map Resp (Set i))]
+perfectPlayer (xs, ys)
+  | Set.size ys == 1 = [([y0], outcomes y0 ys)]
+  | otherwise        = [(xs', outcomes x ys) | x <- xs']
   where
-    subStep ys' =
-      let (xs', candidates) = recursiveDeepBranch xs ys'
-      in  any (\x' -> winsIn (n-1) xs' x' ys') candidates
+    y0 = Set.findMin ys
+    xs' = trimMoves xs ys

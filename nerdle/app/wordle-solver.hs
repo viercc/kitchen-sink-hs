@@ -28,7 +28,9 @@ import Search
 data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff | AnalyseMode AnalysisType FilePath
 
 data PlayDiff = Easy | Normal | Hard
-data AnalysisType = NoLookAhead | LookAhead | Deep
+  deriving Show
+data AnalysisType = Single | Deep Int | Perfect
+  deriving Show
 
 getOption :: IO Option
 getOption =
@@ -49,9 +51,11 @@ parseArgs args = case args of
         ("--normal" : rest') -> (PlayMode inFile Normal, rest')
         ("--hard" : rest') -> (PlayMode inFile Hard, rest')
         _ -> (HelpMode, rest)
-    "--analyse" : "--lookahead" : inFile : rest -> (AnalyseMode LookAhead inFile, rest)
-    "--analyse" : "--deep" : inFile : rest -> (AnalyseMode Deep inFile, rest)
-    "--analyse" : inFile : rest -> (AnalyseMode NoLookAhead inFile, rest)
+    "--analyse" : inFile : rest -> case rest of
+        [] -> (AnalyseMode Single inFile, rest)
+        ("--deep" : rest') -> (AnalyseMode (Deep 10) inFile, rest')
+        ("--perfect" : rest') -> (AnalyseMode Perfect inFile, rest')
+        _ -> (HelpMode, rest)
     rest -> (HelpMode, rest)
 
 readWordListFile :: FilePath -> IO [Word]
@@ -250,22 +254,18 @@ analyseMode la inFile = do
     withCollection ws (analyseMain la)
 
 analyseMain :: Collection Word i => AnalysisType -> Set i -> IO ()
-analyseMain lookAheads allWords = do
-    putStrLn $ strategyName ++ " strategy"
+analyseMain stratName allWords = do
+    putStrLn $ show stratName ++ " strategy"
     prettyTree 0 "" (Set.toList allWords) allWords
   where
-    strategy = case lookAheads of
-        NoLookAhead -> minmaxSizeStrategy
-        LookAhead -> lookAheadStrategy
-        Deep -> recursiveDeepStrategy
-    strategyName = case lookAheads of
-        NoLookAhead -> "Single"
-        LookAhead -> "LookAhead"
-        Deep -> "Deep"
+    strategy = case stratName of
+        Single -> minmaxSizeStrategy
+        Deep w -> heuristicStrategy w
+        Perfect -> perfectStrategy
     
     prettyTree d prefix xs ys =
       do let (xs', x) = strategy xs ys
-         putStrLn $ indent d ++ prefix ++ showWordItem x
+         putStrLn $ ">" ++ indent d ++ prefix ++ showWordItem x
          if Set.size ys > 1
            then prettyChildren (d+1) xs' (outcomes x ys)
            else return ()
@@ -274,6 +274,6 @@ analyseMain lookAheads allWords = do
         for_ (Map.toList resps) $ \(r, s) -> do
             if all (== Hit) r
                 then return ()
-                else prettyTree d (printResp r ++ " ---> ") xs s
+                else prettyTree d (printResp r ++ " → ") xs s
 
     indent d = replicate (2*d) ' '
