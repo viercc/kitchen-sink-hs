@@ -112,7 +112,7 @@ printHelp = putStrLn $
     "\t--init inFile outFile\n" ++
     "\t--solver inFile\n" ++
     "\t--play inFile [--easy | --normal | --hard]    (default: --normal) \n" ++
-    "\t--analyse [--lookahead | --deep] inFile\n"
+    "\t--analyse [--deep | --perfect] inFile\n"
 
 initMode :: FilePath -> FilePath -> IO ()
 initMode inFile outFile = do
