@@ -5,25 +5,23 @@ synopsis:            Analysis of nerdle (and other wordle-like games)
 build-type:          Simple
 extra-source-files:  ABOUT
 
-library
-  hs-source-dirs: src
-  exposed-modules: Digit, Collection, Nerdle, WordleLike
-  build-depends: base >= 4.14, containers, vector, semialign, reflection, data-bag
-  ghc-options:  -Wall -Wcompat
-
-  default-language: Haskell2010
-
 executable list-nerdle
-  hs-source-dirs: app
+  hs-source-dirs: list-nerdle
   main-is: list-nerdle.hs
-  build-depends: base >= 4.14, nerdle
+  other-modules:  Digit, Nerdle
+  build-depends: base >= 4.14
   ghc-options: -Wall
   default-language: Haskell2010
 
 executable wordle-solver
-  hs-source-dirs: app
+  hs-source-dirs: wordle-solver
   main-is: wordle-solver.hs
-  other-modules: Types, Util, Search
-  build-depends: base >= 4.14, vector, containers, random, nerdle, deepseq
+  other-modules: Collection, WordleLike, Types, Util, Search
+  build-depends: base >= 4.14,
+                 vector, containers, data-bag,
+                 semialign,
+                 reflection,
+                 random,
+                 deepseq
   ghc-options: -Wall
   default-language: Haskell2010
