@@ -1,16 +1,17 @@
+{-# LANGUAGE DeriveTraversable #-}
 {-
 
 This module is a collection of weird, unusual
 kinds of Monad instances.
 
 -}
-{-# LANGUAGE DerivingVia       #-}
-{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DerivingVia #-}
+
 module Monad.Esoteric where
 
-import Data.Foldable
 import Control.Applicative
-
+import Control.Monad (ap)
+import Data.Foldable
 import Data.List (unfoldr)
 
 -- These are found by exhaustively searching
@@ -18,67 +19,73 @@ import Data.List (unfoldr)
 
 data Span a = Point a | Span a a
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
-  deriving (Applicative) via (WrappedMonad Span)
+
+instance Applicative Span where
+  pure = Point
+  (<*>) = ap
 
 instance Monad Span where
-  return = Point
   Point a >>= k = k a
   Span a a' >>= k =
     case (k a, k a') of
-      (Point b,  Point b')  -> Span b b'
-      (Point b,  Span _ b') -> Span b b'
-      (Span b _, Point b')  -> Span b b'
+      (Point b, Point b') -> Span b b'
+      (Point b, Span _ b') -> Span b b'
+      (Span b _, Point b') -> Span b b'
       (Span b _, Span _ b') -> Span b b'
 
 enumSpan :: (Alternative f) => f a -> f (Span a)
 enumSpan as =
-      Point <$> as
-  <|> Span <$> as <*> as
+  Point <$> as
+    <|> Span <$> as <*> as
 
 data Gold a = Zero | One a | Two a a
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
-  deriving (Applicative) via (WrappedMonad Gold)
+
+instance Applicative Gold where
+  pure = One
+  (<*>) = ap
 
 instance Monad Gold where
-  return = One
-  Zero    >>= _ = Zero
-  One a   >>= k = k a
+  Zero >>= _ = Zero
+  One a >>= k = k a
   Two a a' >>= k =
     case k a of
       Zero -> Zero
       One b -> case k a' of
-        Zero     -> Two b b
-        One b'   -> Two b b'
+        Zero -> Two b b
+        One b' -> Two b b'
         Two b' _ -> Two b b'
       mb -> mb
 
 enumGold :: (Alternative f) => f a -> f (Gold a)
 enumGold as =
-      pure Zero
-  <|> One <$> as
-  <|> Two <$> as <*> as
+  pure Zero
+    <|> One <$> as
+    <|> Two <$> as <*> as
 
 -- Twist is also found by searching.
 -- What it means is not clear, but at least it passes Monad laws check.
 data Twist a = T Bool a a
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
-  deriving (Applicative) via (WrappedMonad Twist)
+
+instance Applicative Twist where
+  pure a = T False a a
+  (<*>) = ap
 
 instance Monad Twist where
-  return a = T False a a
   (>>=) = bind'
     where
-      bind' ma k = join' $ fmap k ma 
+      bind' ma k = join' $ fmap k ma
       join' (T b (T c x00 x01) (T d x10 x11)) =
         case (b, c, d) of
           (False, False, False) -> T False x00 x11
-          (False, False, True)  -> T False x00 x10
-          (False, True,  False) -> T True  x11 x01
-          (False, True,  True)  -> T True  x10 x01
-          (True,  False, False) -> T True  x01 x10
-          (True,  False, True)  -> T True  x01 x11
-          (True,  True,  False) -> T True  x00 x10
-          (True,  True,  True)  -> T True  x00 x11
+          (False, False, True) -> T False x00 x10
+          (False, True, False) -> T True x11 x01
+          (False, True, True) -> T True x10 x01
+          (True, False, False) -> T True x01 x10
+          (True, False, True) -> T True x01 x11
+          (True, True, False) -> T True x00 x10
+          (True, True, True) -> T True x00 x11
 
 enumTwist :: (Alternative f) => f a -> f (Twist a)
 enumTwist as = T <$> (pure True <|> pure False) <*> as <*> as
@@ -92,19 +99,21 @@ enumTwist as = T <$> (pure True <|> pure False) <*> as <*> as
 
 data Nezzle a = a :| [a]
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
-  deriving (Applicative) via (WrappedMonad Nezzle)
 
 headNezzle :: Nezzle a -> a
 headNezzle (a :| _) = a
 
 tailNezzle :: Nezzle a -> Nezzle a
-tailNezzle (_ :| (a:as)) = a :| as
-tailNezzle single        = single
+tailNezzle (_ :| (a : as)) = a :| as
+tailNezzle single = single
+
+instance Applicative Nezzle where
+  pure a = a :| []
+  (<*>) = ap
 
 instance Monad Nezzle where
-  return a = a :| []
-  a :| []      >>= k = k a
-  a :| (a':as) >>= k =
+  a :| [] >>= k = k a
+  a :| (a' : as) >>= k =
     headNezzle (k a) :| toList ((a' :| as) >>= tailNezzle . k)
 
 -- Not exhaustive; only up to length 3
@@ -117,16 +126,15 @@ enumNezzle as = (:|) <$> as <*> s (s nil)
 --------------------------------
 
 -- Odd-lengthed list
--- 
+--
 -- Monad instance is same as []'s instance.
 -- Because concat'ing odd number of odd-lengthed lists yields
 -- odd-lengthed list, it's a monad.
--- 
+--
 -- "Even-lengthed" list can't have such an instance,
 -- because the length of `return` can't be even.
 data Odd a = Odd a (Even a)
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
-  deriving (Applicative) via (WrappedMonad Odd)
 
 data Even a = Nil | Even a (Odd a)
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
@@ -145,13 +153,16 @@ plusEO (Even x xs) ys = Odd x (plusOO xs ys)
 plusOO :: Odd a -> Odd a -> Even a
 plusOO (Odd x xs) ys = Even x (plusEO xs ys)
 
+instance Applicative Odd where
+  pure a = Odd a Nil
+  (<*>) = ap
+
 instance Monad Odd where
-  return a = Odd a Nil
   ma >>= k = ostep ma
     where
       ostep (Odd x xs) = k x `plusOE` estep xs
-      
-      estep Nil         = Nil
+
+      estep Nil = Nil
       estep (Even x xs) = k x `plusOO` ostep xs
 
 -- [x] or [x,y,z]
@@ -174,8 +185,9 @@ newtype List3Np1 a = List3Np1 [a]
 makeList3Np1 :: [a] -> Maybe (List3Np1 a)
 makeList3Np1 as
   | n `rem` 3 == 1 = Just (List3Np1 as)
-  | otherwise      = Nothing
-  where n = length as
+  | otherwise = Nothing
+  where
+    n = length as
 
 makeInftyList3Np1 :: (s -> (a, s)) -> s -> List3Np1 a
 makeInftyList3Np1 f s = List3Np1 (unfoldr (Just . f) s)

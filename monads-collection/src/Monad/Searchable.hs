@@ -1,7 +1,7 @@
 module Monad.Searchable where
 
 -- | Searchable set
-newtype Set a = Set { find :: (a -> Bool) -> a }
+newtype Set a = Set {find :: (a -> Bool) -> a}
 
 search :: Set a -> (a -> Bool) -> Maybe a
 search xs p = let x = find xs p in if p x then Just x else Nothing
@@ -34,10 +34,10 @@ union xs ys = bigUnion (doubleton xs ys)
 filter :: (a -> Bool) -> Set a -> Set a
 filter p xs = Set $ \q -> find xs (\x -> q x && p x)
 
-prod :: Set a -> Set b -> Set (a,b)
+prod :: Set a -> Set b -> Set (a, b)
 prod as bs = Set $ \p ->
-  let a = find as (\a' -> forsome bs (\b -> p (a',b)))
-  in (a, find bs (\b -> p (a, b)))
+  let a = find as (\a' -> forsome bs (\b -> p (a', b)))
+   in (a, find bs (\b -> p (a, b)))
 
 sum :: Set a -> Set b -> Set (Either a b)
 sum as bs = union (fmap Left as) (fmap Right bs)
@@ -53,5 +53,4 @@ instance Applicative Set where
   fs <*> xs = fmap (uncurry ($)) $ prod fs xs
 
 instance Monad Set where
-  return = singleton
   xs >>= f = bigUnion (fmap f xs)

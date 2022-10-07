@@ -333,8 +333,6 @@ instance Applicative Set where
   {-# INLINABLE (*>) #-}
 
 instance Monad Set where
-  return = singleton
-  {-# INLINABLE return #-}
   as >>= f = case as of
     Prim s -> foldMap f s
     Cont t -> t f

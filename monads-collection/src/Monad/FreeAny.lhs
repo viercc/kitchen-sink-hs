@@ -23,10 +23,9 @@ Free is a Functor, Applicative and Monad.
 > instance Functor (Free c) where
 >   fmap f (Free h) = Free $ \k -> h (k . f)
 > instance Applicative (Free c) where
->   pure = return
+>   pure a = Free $ \k -> k a
 >   (<*>) = ap
 > instance Monad (Free c) where
->   return a = Free $ \k -> k a
 >   ma >>= f = Free $ \k -> runFree ma (\a -> runFree (f a) k)
 
 "Free Monoid" is indeed free monoid.
