@@ -182,8 +182,7 @@ newtype List3Np1 a = List3Np1 [a]
   -- Monad instance inherited from [] keeps invariant.
   deriving (Applicative, Monad) via []
 
-makeList3Np1 :: [a] -> Maybe (List3Np1 a)
-makeList3Np1 as
+    go s = case f s of
   | n `rem` 3 == 1 = Just (List3Np1 as)
   | otherwise = Nothing
   where
