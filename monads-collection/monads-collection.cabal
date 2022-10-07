@@ -24,11 +24,14 @@ library
                      Monad.ShrinkOnce,
                      Monad.Esoteric,
                      Monad.Builder,
+                     Monad.Efreet,
                      MonadLaws
   build-depends:     base >=4.11 && <5
                    , containers
                    , mtl
                    , stm
+                   , comonad
+                   , free
   default-language:  Haskell2010
   ghc-options:       -Wall -Wcompat
 
