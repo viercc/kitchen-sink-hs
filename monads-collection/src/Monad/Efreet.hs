@@ -1,12 +1,17 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Monad.Efreet where
 
+import Control.Applicative
 import Control.Comonad
 import Control.Comonad.Cofree
+import Control.Monad (ap)
 import Control.Monad.Trans.Free
+import Data.Bool (bool)
 import GHC.Generics ((:.:) (..))
+import MonadLaws
 
 -- | 'Efreet' is both 'Monad' and 'Comonad'.
 data Efreet f x = x :> Maybe (f (Efreet f x))
@@ -98,3 +103,34 @@ Given various @f@, what Monad and Comonad @Efreet f@ is?
     [ x,a,x , a,  x , a,  x,a,x,a,x ] :: AList a x
 
 -}
+
+-- Efreet ((->) a) is strange! Let's investigate the smallest non-degenerate case : a = Bool!
+
+data Tree x = Leaf x | Branch x (Tree x) (Tree x)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+
+toTree :: Efreet ((->) Bool) x -> Tree x
+toTree (x :> Nothing) = Leaf x
+toTree (x :> Just children) = Branch x (toTree (children False)) (toTree (children True))
+
+fromTree :: Tree x -> Efreet ((->) Bool) x
+fromTree (Leaf x) = x :> Nothing
+fromTree (Branch x l r) = x :> Just (bool (fromTree l) (fromTree r))
+
+instance Applicative Tree where
+  pure = Leaf
+  (<*>) = ap
+
+instance Monad Tree where
+  Leaf x >>= f = f x
+  Branch x l r >>= f = glueTree (f x) (l >>= f, r >>= f)
+
+glueTree :: Tree x -> (Tree x, Tree x) -> Tree x
+glueTree (Leaf x) (yl, yr) = Branch x yl yr
+glueTree (Branch x l r) ylr = Branch x (glueTree l ylr) (glueTree r ylr)
+
+enumTree :: Enum1 Tree
+enumTree ma = s z
+  where
+    z = Leaf <$> ma
+    s mx = z <|> (Branch <$> ma <*> mx <*> mx)

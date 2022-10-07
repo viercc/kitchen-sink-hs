@@ -182,7 +182,15 @@ newtype List3Np1 a = List3Np1 [a]
   -- Monad instance inherited from [] keeps invariant.
   deriving (Applicative, Monad) via []
 
+unfoldrList3Np1 :: (s -> Either a (a, a, a, s)) -> s -> List3Np1 a
+unfoldrList3Np1 f = List3Np1 . go
+  where
     go s = case f s of
+      Left a -> [a]
+      Right (a0, a1, a2, s') -> a0 : a1 : a2 : go s'
+
+toList3Np1 :: [a] -> Maybe (List3Np1 a)
+toList3Np1 as
   | n `rem` 3 == 1 = Just (List3Np1 as)
   | otherwise = Nothing
   where

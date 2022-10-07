@@ -44,6 +44,15 @@ test-suite esoteric-test
   default-language: Haskell2010
   ghc-options:      -rtsopts -with-rtsopts=-M64m
 
+test-suite efreet-test
+  type:    exitcode-stdio-1.0
+  main-is: EfreetTest.hs
+  hs-source-dirs: test
+  build-depends: base >=4.11 && <5
+               , monads-collection
+  default-language: Haskell2010
+  ghc-options:      -rtsopts -with-rtsopts=-M64m
+
 executable monad-queue-test
   main-is: QueueTest.hs
   hs-source-dirs: test
