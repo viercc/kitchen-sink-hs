@@ -12,12 +12,23 @@ import GHC.Generics ((:.:) (..))
 data Efreet f x = x :> Maybe (f (Efreet f x))
   deriving (Functor)
 
+-- | @Efreet f@ is isomorphic to @'Cofree' (Maybe :.: f)@
 toCofree :: Functor f => Efreet f x -> Cofree (Maybe :.: f) x
 toCofree (x :> mfr) = x :< fmap toCofree (Comp1 mfr)
 
 fromCofree :: Functor f => Cofree (Maybe :.: f) x -> Efreet f x
 fromCofree (x :< mfr) = x :> unComp1 (fmap fromCofree mfr)
 
+-- | @Efreet f x@ is isomorphic to @'FreeT' f ((,) x) ()@
+--
+--   This can be compared to @ListT m x@ ("done right")
+--
+--   > newtype ListT m x = ListT { runListT :: m (Maybe (x, ListT m x)) }
+--
+--   Which also can be written in terms of FreeT:
+--
+--   > Efreet f   x ~ FreeT f       ((,) x) ()
+--   > ListT    m x ~ FreeT ((,) x) m       ()
 toFreeT :: Functor f => Efreet f x -> FreeT f ((,) x) ()
 toFreeT = go
   where
