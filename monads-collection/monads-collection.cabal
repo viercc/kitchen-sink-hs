@@ -25,6 +25,7 @@ library
                      Monad.Esoteric,
                      Monad.Builder,
                      Monad.Efreet,
+                     Monad.Trie,
                      MonadLaws
   build-depends:     base >=4.11 && <5
                    , containers
@@ -47,6 +48,15 @@ test-suite esoteric-test
 test-suite efreet-test
   type:    exitcode-stdio-1.0
   main-is: EfreetTest.hs
+  hs-source-dirs: test
+  build-depends: base >=4.11 && <5
+               , monads-collection
+  default-language: Haskell2010
+  ghc-options:      -rtsopts -with-rtsopts=-M64m
+
+test-suite trie-test
+  type:    exitcode-stdio-1.0
+  main-is: TrieTest.hs
   hs-source-dirs: test
   build-depends: base >=4.11 && <5
                , monads-collection

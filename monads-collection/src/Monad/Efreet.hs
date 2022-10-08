@@ -130,7 +130,7 @@ glueTree (Leaf x) (yl, yr) = Branch x yl yr
 glueTree (Branch x l r) ylr = Branch x (glueTree l ylr) (glueTree r ylr)
 
 enumTree :: Enum1 Tree
-enumTree ma = s z
+enumTree ma = t1 <|> t2
   where
-    z = Leaf <$> ma
-    s mx = z <|> (Branch <$> ma <*> mx <*> mx)
+    t1 = Leaf <$> ma
+    t2 = Branch <$> ma <*> t1 <*> t1
