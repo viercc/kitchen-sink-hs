@@ -1,21 +1,33 @@
-    {-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds #-}
-    module QualPolyKind.B where
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-    import QualPolyKind.A
+module QualPolyKind.B where
 
-    -- MkB :: forall k (a :: k). (forall (m :: k -> *). m a -> m a) -> B a
-    newtype B a = MkB (forall m. m a -> m a)
+import Data.Kind (Type)
+import QualPolyKind.A
 
-    -- fooA :: forall k (a :: k). (forall (m :: k -> *). m a -> m a) -> ()
-    fooA :: forall a. (forall m. m a -> m a) -> ()
-    fooA f =
-      let xx :: A a
-          xx = MkA f
-      in ()
+-- MkB :: forall k (a :: k). (forall (m :: k -> *). m a -> m a) -> B a
+newtype B a = MkB (forall m. m a -> m a)
 
-    -- fooB :: forall k (a :: k). (forall (m :: k -> *). m a -> m a) -> ()
-    fooB :: forall a. (forall m. m a -> m a) -> ()
-    fooB f =
-      let xx :: B a
-          xx = MkB f
-      in ()
+fooA :: forall (a :: Type). (forall m. m a -> m a) -> ()
+-- If the type annotation lacks the kind of @a@, like:
+--
+-- > fooA :: forall a. (forall m. m a -> m a) -> ()
+--
+-- it will mean below
+--
+-- > fooA :: forall k (a :: k). (forall (m :: k -> *). m a -> m a) -> ()
+--
+-- and this doesn't typecheck.
+fooA f =
+  let xx :: A a
+      xx = MkA f
+   in ()
+
+-- fooB :: forall k (a :: k). (forall (m :: k -> *). m a -> m a) -> ()
+fooB :: forall a. (forall m. m a -> m a) -> ()
+fooB f =
+  let xx :: B a
+      xx = MkB f
+   in ()
