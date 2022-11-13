@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DerivingVia #-}
-module Monad where
+module Partial.Monad where
 
 import Prelude hiding (id, (.))
 import Control.Monad (ap)

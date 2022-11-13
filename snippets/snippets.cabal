@@ -26,6 +26,7 @@ library
                      , transformers
                      , mtl
                      , free
+                     , data-memocombinators
   ghc-options:       -Wall -Wcompat
                      -Wunused-packages -Wwarn=unused-packages
   default-language:  Haskell2010

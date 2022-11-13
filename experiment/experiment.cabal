@@ -47,6 +47,7 @@ library
                      , containers
                      , data-ordlist
                      , vector
+                     , data-memocombinators
 
                      , integer-logarithms
 
@@ -55,10 +56,10 @@ library
                      , semialign
                      , rank2classes
                      , these
-                     , type-natural
+                     , type-natural >= 1.1.0
+                     , ghc-typelits-presburger >= 0.6.2
                      , finite-typelits
                      , finitary
-                     , partial-semigroup
                      
                      , transformers
                      , mtl
