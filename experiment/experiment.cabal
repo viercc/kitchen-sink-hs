@@ -33,13 +33,11 @@ library
 
                    Selective.Prism, Selective.Night,
 
-                   Data.Set.Extra, PureSet,
+                   Data.Set.Extra, Data.PureSet, Data.PureSet.Compact,
 
                    TreesThatGrow,
 
                    Isomorphisms, Isomorphisms2,
-
-                   Data.Finite.Extra, Polynomial
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
@@ -51,15 +49,14 @@ library
 
                      , integer-logarithms
 
+                     , finitary
+                     , finite-typelits
+
                      , lens
                      , selective
                      , semialign
                      , rank2classes
                      , these
-                     , type-natural >= 1.1.0
-                     , ghc-typelits-presburger >= 0.6.2
-                     , finite-typelits
-                     , finitary
                      
                      , transformers
                      , mtl

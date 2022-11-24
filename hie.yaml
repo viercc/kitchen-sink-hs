@@ -33,5 +33,5 @@ cradle:
     - path: "graph-chart/app"
       component: "exe:graph-chart"
     
-    - path: "monads-collection.cabal"
+    - path: "monads-collection/src"
       component: "lib:monads-collection"
