@@ -14,11 +14,11 @@ absurdV1 :: V1 a -> b
 absurdV1 v1 = case v1 of { }
 
 infixr 9 #.
-(#.) :: (Coercible b c) -> (b `arr` c) -> (a -> b) -> (a -> c)
+(#.) :: (Coercible b c) => (b `arr` c) -> (a -> b) -> (a -> c)
 _ #. f = coerce f
 
 infixr 9 .#
-(.#) :: (Coercible a b) -> (b -> c) -> (a `arr` b) -> (a -> c)
+(.#) :: (Coercible a b) => (b -> c) -> (a `arr` b) -> (a -> c)
 f .# _ = coerce f
 
 -- | A class which `Fix f` have a zipper
@@ -26,10 +26,10 @@ class (Functor (Der f), Traversable f) => Tooth f where
     type Der f :: Type -> Type
     
     children :: f a -> f (Der f a, a)
-    children = runIdentity #. traverseChildren (uncurry Identity)
+    children = runIdentity #. traverseChildren (curry Identity)
 
     traverseChildren :: Applicative g => (Der f a -> a -> g b) -> f a -> g (f b)
-    traverseChildren h = traverse (curry h) . children
+    traverseChildren h = traverse (uncurry h) . children
 
     parent :: Der f a -> a -> f a
 
@@ -55,7 +55,7 @@ instance Tooth f => Tooth (M1 p i f) where
 
 instance Tooth f => Tooth (Rec1 f) where
     type Der (Rec1 f) = Der f
-    children = Rec1 $. children .# unRec1
+    children = Rec1 #. children .# unRec1
     parent df a = Rec1 (parent df a)
 
 instance Tooth Par1 where
@@ -85,4 +85,4 @@ instance (Tooth f, Tooth g) => Tooth (f :.: g) where
     traverseChildren h (Comp1 fg) = Comp1 <$>
         traverseChildren (\dfg g -> traverseChildren (\dg -> h (Comp1 dfg :*: dg)) g) fg
     
-    parent (dfg :*: dg) a = Comp1 (parent df (parent dg a))
+    parent (Comp1 dfg :*: dg) a = Comp1 (parent dfg (parent dg a))

@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf   #-}
-module CNF(
+module Ordinal(
   CNF(),
   omega,
   OrdinalView(..),

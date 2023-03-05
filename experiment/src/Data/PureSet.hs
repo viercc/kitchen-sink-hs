@@ -177,7 +177,7 @@ showAngles = ($ "") . go
 
 -- | successor function of von Neumann encoding of natural number
 vnsucc :: Set -> Set
-vnsucc x@(MkSet s) = MkSet (D.insert x s)
+vnsucc x = insert x x
 
 -- | von Neumann encoding of natural number
 vnnat :: Natural -> Set
