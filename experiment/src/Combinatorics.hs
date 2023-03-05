@@ -1,7 +1,7 @@
 module Combinatorics where
 
 import Data.Function (on)
-import Data.List (groupBy, permutations)
+import Data.List (groupBy, permutations, intercalate)
 import Data.Monoid (Ap (..))
 import qualified Data.Set as Set
 import qualified Data.Vector.Unboxed as UV
@@ -188,6 +188,13 @@ uniquePointedContigencyTables h w n =
 
 pprTable :: Table -> String
 pprTable MkTable {numRows = h, numCols = w, entries = tab} = unlines . fmap (unwords . zipWith leftPad cellWidths) $ strCells
+  where
+    leftPad n s = replicate (n - length s) ' ' ++ s
+    strCells = fmap (fmap (show . (tab UV.!))) (rowIndices h w)
+    cellWidths = foldr (zipWith max) (repeat 0) $ fmap (fmap length) strCells
+
+latexTable :: Table -> String
+latexTable MkTable {numRows = h, numCols = w, entries = tab} = intercalate " \\\\ " . fmap (intercalate " & " . zipWith leftPad cellWidths) $ strCells
   where
     leftPad n s = replicate (n - length s) ' ' ++ s
     strCells = fmap (fmap (show . (tab UV.!))) (rowIndices h w)

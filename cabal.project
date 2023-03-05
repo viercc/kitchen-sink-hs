@@ -1,4 +1,4 @@
-optional-packages: ./*/*.cabal, ./*/*/*.cabal
+packages: ./*/*.cabal, ./*/*/*.cabal
 
 allow-newer: all
 
