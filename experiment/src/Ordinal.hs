@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf   #-}
-module Ordinal(
-  Ordinal(),
+module CNF(
+  CNF(),
   omega,
   OrdinalView(..),
   view,
@@ -9,40 +9,51 @@ module Ordinal(
   hardy, hardy_eps0
 ) where
 
-type Natural = Integer
+import Data.Ord (comparing)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Numeric.Natural
+import Data.Maybe (fromMaybe)
 
--- | Ordinal numbers represented by Cantor Normal Form
-newtype Ordinal = CNF [(Ordinal, Natural)]
-                deriving (Eq, Ord)
+-- | CNF numbers represented by Cantor Normal Form
+newtype CNF = MkCNF { toMap :: Map CNF Natural }
+                deriving (Eq)
 
-omega :: Ordinal -> Ordinal
-omega a = CNF [(a,1)]
+instance Ord CNF where
+  compare = comparing (Map.toDescList . toMap)
 
-addOrdinal :: Ordinal -> Ordinal -> Ordinal
-addOrdinal x (CNF []) = x
-addOrdinal (CNF xs) (CNF (y:ys)) = CNF $ loop xs
-  where
-    loop [] = y:ys
-    loop ((e,n):zs) =
-      case compare e (fst y) of
-        GT -> (e,n) : loop zs
-        EQ -> let !n' = n + snd y in (e,n') : ys
-        LT -> y:ys
+zero :: CNF
+zero = MkCNF Map.empty
 
-multOrdinal :: Ordinal -> Ordinal -> Ordinal
-multOrdinal (CNF xs) (CNF ys) = foldr addOrdinal 0 $ fmap (multOne xs) ys
-  where
-    multOne []     _     = 0
-    multOne ((e,n):as) (f,m) =
-      if f == 0
-      then let !n' = n * m in CNF ((e, n') : as)
-      else omega (addOrdinal e f)
+fromNatural :: Natural -> CNF
+fromNatural 0 = zero
+fromNatural k = MkCNF $ Map.singleton zero k
 
-instance Num Ordinal where
+omega :: CNF -> CNF
+omega a = MkCNF $ Map.singleton a 1
+
+addOrdinal :: CNF -> CNF -> CNF
+addOrdinal x (MkCNF ys) = case Map.maxViewWithKey ys of
+  Nothing -> x
+  Just ((y,n),ys') -> case Map.splitLookup y (toMap x) of
+    (_xsLow, maybeM, xsHigh) ->
+      let n' = fromMaybe 0 maybeM + n
+       in MkCNF $ Map.union xsHigh (Map.insert y n' ys')
+
+multOrdinal :: CNF -> CNF -> CNF
+multOrdinal (MkCNF xs) (MkCNF ys) = case Map.maxViewWithKey xs of
+  Nothing -> zero
+  Just ((e,n),xsLow) ->
+    MkCNF $ Map.fromDistinctDescList $ do
+      (f,m) <- Map.toDescList ys
+      if f == zero
+        then (e, n * m) : Map.toDescList xsLow
+        else [ (addOrdinal e f, m) ]
+
+instance Num CNF where
     fromInteger n
       | n < 0     = error "Not a natural number"
-      | n == 0    = CNF []
-      | otherwise = CNF [(0, n)]
+      | otherwise = fromNatural (fromInteger n)
     (+) = addOrdinal
     (*) = multOrdinal
     (-) = error "No Subtraction"
@@ -58,50 +69,47 @@ parensIf' :: Bool -> ShowS -> ShowS
 parensIf' True  x = ('(':) . x . (')':)
 parensIf' False x = x
 
-instance Show Ordinal where
+instance Show CNF where
   showsPrec = sprec where
-    sprec _ (CNF []) = ("0"++)
-    sprec p (CNF xs) = (intercalate' (const id) plus $ fmap conv xs) p
-
-    conv (e,n) q =
+    sprec p x = showSum p (Map.toDescList (toMap x))
+    showSum _ [] = ("0" ++)
+    showSum p xs = (intercalate' (const id) plus $ fmap showTerm xs) p
+    
+    showTerm (e,n) q =
       let strE = if e == 1 then ("ω"++) else ("ω^"++) . sprec 8 e
           strN = shows n
       in if | e == 0     -> strN
             | n == 1     -> strE
             | otherwise  -> parensIf' (q>4) (strE . ('*':) . strN)
-    plus a b = \q -> parensIf' (q>3) (a 2 . (" + " ++) . b 3)
+    plus a b q = parensIf' (q>3) (a 2 . (" + " ++) . b 3)
 
-data OrdinalView = Zero | Succ Ordinal | Lim (Natural -> Ordinal)
+data OrdinalView a = Zero | Succ a | Lim (Natural -> a)
 
-view :: Ordinal -> OrdinalView
-view (CNF []) = Zero
-view (CNF [(e,1)]) =
-  case view e of
-    Zero    -> Succ 0
-    Succ e' -> Lim (\n -> CNF [(e',n)])
-    Lim f   -> Lim (\n -> omega (f n))
-view (CNF [(e,n)]) = consView (e,n-1) (view (CNF [(e,1)]))
-view (CNF (x:xs))  = consView x (view (CNF xs))
+view :: CNF -> OrdinalView CNF
+view (MkCNF xs) = case Map.minViewWithKey xs of
+  Nothing -> Zero
+  Just ((e,n),xsHigh) ->
+    let x' | n > 1    = MkCNF $ Map.insert e (n - 1) xsHigh
+           | otherwise = MkCNF xsHigh
+    in case view e of
+         Zero -> Succ x'
+         Succ e' -> Lim (\k -> x' + omega e' * fromNatural k)
+         Lim f   -> Lim (\k -> x' + omega (f k))
 
-consView :: (Ordinal, Natural) -> OrdinalView -> OrdinalView
-consView x Zero            = Succ (CNF [x])
-consView x (Succ (CNF xs)) = Succ (CNF (x:xs))
-consView x (Lim f)         = Lim (\n -> case f n of CNF xs -> CNF (x:xs))
-
-instance Show OrdinalView where
+instance Show a => Show (OrdinalView a) where
   show Zero = "<Zero>"
-  show (Succ n) = "<Succ " ++ (showsPrec 9 n ">")
+  show (Succ n) = "<Succ " ++ showsPrec 9 n ">"
   show (Lim f)  = "<" ++ s 1 ++ ", " ++ s 2 ++ ", " ++ s 3 ++ ", ...>"
     where s = show . f
 
 -- | Hardy hierarchy
-hardy :: Ordinal -> Integer -> Integer
+hardy :: CNF -> Natural -> Natural
 hardy x !n = case view x of
   Zero    -> n
   Succ x' -> hardy x' (1 + n)
   Lim f   -> hardy (f n) n
 
-hardy_eps0 :: Integer -> Integer
+hardy_eps0 :: Natural -> Natural
 hardy_eps0 n = hardy (nTimes n omega 0) n
   where
     nTimes 0 _ x = x
