@@ -24,12 +24,14 @@ import WordleLike ( Response(..) )
 
 import Types
 import Search
+import Data.Ord (Down(..))
+import Text.Read (readMaybe)
 
-data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff | AnalyseMode AnalysisType FilePath
+data Option = HelpMode | InitMode FilePath FilePath | InteractiveMode FilePath | PlayMode FilePath PlayDiff | AnalyseMode FilePath AnalysisType
 
 data PlayDiff = Easy | Normal | Hard
   deriving Show
-data AnalysisType = Single | Deep Int | Perfect
+data AnalysisType = Simple | Heuristic !Int | Perfect
   deriving Show
 
 getOption :: IO Option
@@ -52,11 +54,28 @@ parseArgs args = case args of
         ("--hard" : rest') -> (PlayMode inFile Hard, rest')
         _ -> (HelpMode, rest)
     "--analyse" : inFile : rest -> case rest of
-        [] -> (AnalyseMode Single inFile, rest)
-        ("--deep" : rest') -> (AnalyseMode (Deep 10) inFile, rest')
-        ("--perfect" : rest') -> (AnalyseMode Perfect inFile, rest')
+        [] -> (AnalyseMode inFile Simple, rest)
+        ("--simple" : rest') -> (AnalyseMode inFile Simple, rest')
+        ("-h" : rest') -> (AnalyseMode inFile (Heuristic 5), rest')
+        ("--heuristic" : heuristicWidth : rest') -> case readMaybe heuristicWidth of
+          Just width -> (AnalyseMode inFile (Heuristic width), rest')
+          Nothing    -> (HelpMode, rest)
+        ("--perfect" : rest') -> (AnalyseMode inFile Perfect, rest')
         _ -> (HelpMode, rest)
     rest -> (HelpMode, rest)
+
+printHelp :: IO ()
+printHelp = putStrLn $ unlines [
+    "Usage: wordle-solver",
+    "\t--help",
+    "\t--init inFile outFile",
+    "\t--solver inFile",
+    "\t--play inFile [--easy | --normal | --hard]",
+    "\t\t (default: --normal)",
+    "\t--analyse inFile [--simple | -h | --heuristic N | --perfect]",
+    "\t\t (default: --simple)",
+    "\t\t -h is a shorthand for --heuristic 5"
+  ]
 
 readWordListFile :: FilePath -> IO [Word]
 readWordListFile fileName = do
@@ -103,28 +122,24 @@ main = do
         InitMode inFile outFile -> initMode inFile outFile
         InteractiveMode inFile -> interactiveMode inFile
         PlayMode inFile difficulty -> playMode inFile difficulty
-        AnalyseMode lookAheads inFile -> analyseMode lookAheads inFile
-
-printHelp :: IO ()
-printHelp = putStrLn $
-    "Usage: wordle-solver\n" ++
-    "\t--help\n" ++
-    "\t--init inFile outFile\n" ++
-    "\t--solver inFile\n" ++
-    "\t--play inFile [--easy | --normal | --hard]    (default: --normal) \n" ++
-    "\t--analyse [--deep | --perfect] inFile\n"
+        AnalyseMode inFile analysisType -> analyseMode inFile analysisType
 
 initMode :: FilePath -> FilePath -> IO ()
 initMode inFile outFile = do
     putStrLn "Sorting the word list by heuristic (better -> worse)"
     putStrLn "This will take a time..."
     ws <- readWordListFileWithMsg inFile
-    let ws' = withCollection ws sortByHeuristic
+    let ws' = withCollection ws $ \coll ->
+          let sortedItems = sortOn (Down . informationScore) $ Set.toList coll
+          in  map itemValue sortedItems
     withFile outFile WriteMode $ \out ->
         for_ ws' $ \w -> hPutStrLn out (toList w)
 
-sortByHeuristic :: Collection Word i => Set i -> [Word]
-sortByHeuristic coll = map itemValue $ sortOn (\x -> scoreRespBy Set.size x (outcomes x coll)) $ Set.toList universe
+informationScore :: Collection Word i => i -> Double
+informationScore i = negate $ sum [ p * log p | resp <- Map.elems (outcomes i allWords), let p = fromIntegral (Set.size resp) / n ]
+  where
+    allWords = universe
+    n = fromIntegral (Set.size allWords)
 
 interactiveMode :: FilePath -> IO ()
 interactiveMode inFile = do
@@ -159,9 +174,7 @@ interactiveMain coll = banner >> forever wizard
 
     allWords = Set.toList universe :: [i]
     
-    loop (s,recommend) undoStack
-      | Set.size s <= 1 = putStrLn $ "Answer: " ++ show (itemValue recommend)
-      | otherwise = do
+    loop (s,recommend) undoStack = do
         describeCandidates s
         putStrLn $ "Recommend: " ++ show (itemValue recommend)
         iCmd <- askQuery
@@ -173,9 +186,11 @@ interactiveMain coll = banner >> forever wizard
             case respCmd of
               SolverUndo -> undo undoStack
               SolverReset -> reset
-              SolverQuery s' ->
-                let (_,recommend') = minmaxSizeStrategy allWords s'
-                in loop (s', recommend') ((s, recommend) : undoStack)
+              SolverQuery s'
+                | Set.null s' -> putStrLn "Congrats!"
+                | otherwise -> 
+                  let (_,recommend') = simplePlay allWords s'
+                  in loop (s', recommend') ((s, recommend) : undoStack)
     
     reset = putStrLn "Return to the start of the game..." >> wizard
     undo []              = reset
@@ -186,6 +201,7 @@ interactiveMain coll = banner >> forever wizard
     askResp r = promptInteract "Enter the response > " (readCmdByMap readResp r)
 
     describeCandidates s
+      | Set.size s == 1 = putStrLn $ "The answer is " ++ show (itemValue (Set.findMin s))
       | Set.size s <= 5 = putStrLn numMsg >>
                           for_ s (print . itemValue)
       | otherwise       = putStrLn numMsg
@@ -248,32 +264,32 @@ playMain diff coll = forever wizard
     revWordMap = Map.fromList [ (itemValue i, i) | i <- Set.toList coll ]
     askQuery = promptMap "Enter the query> " (Just . V.fromList) revWordMap
 
-analyseMode :: AnalysisType -> FilePath -> IO ()
-analyseMode la inFile = do
+analyseMode :: FilePath -> AnalysisType -> IO ()
+analyseMode inFile analysisType = do
     ws <- readWordListFileWithMsg inFile
-    withCollection ws (analyseMain la)
+    withCollection ws (analyseMain analysisType)
 
-analyseMain :: Collection Word i => AnalysisType -> Set i -> IO ()
-analyseMain stratName allWords = do
+analyseMain :: forall proxy i. Collection Word i => AnalysisType -> proxy i -> IO ()
+analyseMain stratName _ = do
     putStrLn $ show stratName ++ " strategy"
-    prettyTree 0 "" (Set.toList allWords) allWords
+    prettyTree 0 "" strategy
   where
+    strategy :: Collection Word i => Strategy i
     strategy = case stratName of
-        Single -> minmaxSizeStrategy
-        Deep w -> heuristicStrategy w
+        Simple -> simpleStrategy
+        Heuristic w -> heuristicStrategy w
         Perfect -> perfectStrategy
     
-    prettyTree d prefix xs ys =
-      do let (xs', x) = strategy xs ys
-         putStrLn $ ">" ++ indent d ++ prefix ++ showWordItem x
-         if Set.size ys > 1
-           then prettyChildren (d+1) xs' (outcomes x ys)
-           else return ()
+    prettyTree d prefix s = case s of
+      AlreadyWon -> return ()
+      Strategy x children ->
+        do putStrLn $ ">" ++ indent d ++ prefix ++ showWordItem x
+           prettyChildren (d+1) children
     
-    prettyChildren d xs resps =
+    prettyChildren d resps =
         for_ (Map.toList resps) $ \(r, s) -> do
             if all (== Hit) r
                 then return ()
-                else prettyTree d (printResp r ++ " → ") xs s
+                else prettyTree d (printResp r ++ " → ") s
 
     indent d = replicate (2*d) ' '

@@ -1,16 +1,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE BangPatterns #-}
-module Search(outcomes, Score, scoreRespBy,
-  minmaxSizeStrategy, heuristicStrategy, perfectStrategy
+{-# LANGUAGE TupleSections #-}
+module Search(outcomes,
+  simplePlay,
+  Strategy(..),
+  simpleStrategy, heuristicStrategy, perfectStrategy
 ) where
 
 import Prelude hiding (Word)
 
-import Data.Ord (comparing)
+import Data.Ord (comparing, Down (..))
 import Data.Foldable
-import Data.List (sortBy, partition)
+import Data.List (partition, sortOn)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -23,24 +25,16 @@ import WordleLike
 import Types
 import Util
 
+import GameTree (Nat(..), minimumNat, maximumNat)
+import Data.Bifunctor (Bifunctor(..))
+import Data.Either (partitionEithers)
+
 outcomes :: Collection Word i => i -> Set i -> Map Resp (Set i)
-outcomes x ys = Map.fromListWith Set.union [ (resp y, Set.singleton y) | y <- Set.toList ys ]
+outcomes x ys = Map.fromListWith Set.union (resp <$> Set.toList ys)
   where
-    resp y = response (itemValue y) xWord
+    resp y | x == y    = (response xWord xWord, Set.empty)
+           | otherwise = (response (itemValue y) xWord, Set.singleton y)
     xWord = itemValue x
-
-isWinningResp :: Map Resp s -> Bool
-isWinningResp m = Map.size m == 1 && all (==Hit) (fst (Map.findMin m))
-
-trimMoves :: Collection Word i => [i] -> Set i -> [i]
-trimMoves xs ys = xsAns ++ filter isEffective xsNonAns
-  where
-    (xsAns, xsNonAns) = partition (`Set.member` ys) xs
-    isEffective x = case Set.minView ys of
-          Nothing -> True
-          Just (y0, ys') -> let r0 = resp y0 in all (\y -> resp y == r0) ys'
-      where
-        resp y = response (itemValue x) (itemValue y)
 
 effectiveMoves :: Collection Word i => [i] -> Set i -> [(i, Map Resp (Set i))]
 effectiveMoves xs ys = 
@@ -49,73 +43,126 @@ effectiveMoves xs ys =
   where
     (xsAns, xsNonAns) = partition (`Set.member` ys) xs
 
--- Score (smaller is better)
+-- | Heuristic Score (smaller is better)
 type Score = Int
 
-scoreRespBy :: forall i. Collection Word i => (Set i -> Score) -> i -> Map Resp (Set i) -> Score
-scoreRespBy f x resps
-    | isAnswer  = 0 
-    | otherwise = maximumOf f resps
-  where
-    isAnswer = Map.elems resps == [Set.singleton x]
+scoreResp :: forall i. Collection Word i => Map Resp (Set i) -> Score
+scoreResp = maximumOf Set.size
 
-minmaxSizeStrategy :: forall i. Collection Word i => [i] -> Set i -> ([i], i)
-minmaxSizeStrategy xs ys
+simplePlay :: forall i. Collection Word i => [i] -> Set i -> ([i], i)
+simplePlay xs ys
   | Set.size ys <= 1 = ([], Set.findMin ys)
   | otherwise        = xs' `listSeq` (xs', winner)
   where
-    results = [ (x, score) | (x, resp) <- effectiveMoves xs ys, let !score = scoreRespBy Set.size x resp ]
+    results = [ (x, score) | (x, resp) <- effectiveMoves xs ys, let !score = scoreResp resp ]
     xs' = map fst results
     winner = fst $ minimumBy (comparing snd) results
 
-winsIn :: (a -> [b]) -> (b -> [a]) -> Int -> a -> Bool
-winsIn opponent player = opponentTurn
-  where
-    opponentTurn n a = n > 0 && all (playerTurn n) (opponent a)
-    playerTurn n a = any (opponentTurn (n-1)) (player a)
+----------------------
 
-respOpponent :: Collection Word i => ([i], Map Resp (Set i)) -> [([i], Set i)]
-respOpponent (xs, resp)
-  | isWinningResp resp = []
-  | otherwise          = [ (xs, ys') | ys' <- Map.elems resp ]
+data Strategy i = Strategy { _bestPlay :: i, _nextState :: Map Resp (Strategy i) } | AlreadyWon
+   deriving Show
 
-perfectStrategy :: forall i. Collection Word i => [i] -> Set i -> ([i], i)
-perfectStrategy xs ys
-  | Set.size ys <= 1 = ([], Set.findMin ys)
-  | otherwise        = (xs', winner)
+simpleStrategy :: forall i. Collection Word i => Strategy i
+simpleStrategy = go (Set.toList universe) universe
   where
-    xs' = trimMoves xs ys
-    winner = head [ x | maxDepth <- [1 .. ], x <- xs', winsIn' maxDepth (xs', outcomes x ys) ]
-    winsIn' = winsIn respOpponent perfectPlayer
+    go xs ys = case Set.toList ys of
+      []   -> AlreadyWon
+      [y0] -> Strategy { _bestPlay = Set.findMin ys, _nextState = AlreadyWon <$ outcomes y0 ys }
+      _    -> Strategy { _bestPlay = winner, _nextState = go xs' <$> winnerResp }
+      where
+        results = sortOn (scoreResp . snd) $ effectiveMoves xs ys
+        xs' = map fst results
+        (winner, winnerResp) = head results
 
-heuristicBranch :: forall i. Collection Word i => Int -> [i] -> Set i -> ([i], [i])
-heuristicBranch width xs ys = (xs', candidates)
-  where
-    results = [ (x, score) | (x, resp) <- effectiveMoves xs ys, let !score = scoreRespBy Set.size x resp ]
-    xs' = map fst results
-    candidates = map fst $ take width $ sortBy (comparing snd) results
+data GameTree s i = GameTree { _gameState :: s, _playerMoves :: [(i, Map Resp (GameTree s i))] }
 
-heuristicStrategy :: forall i. Collection Word i => Int -> [i] -> Set i -> ([i], i)
-heuristicStrategy width xs ys
-  | Set.size ys <= 1 = ([], Set.findMin ys)
-  | otherwise        = (xs', winner)
+calcGuessedDepth :: (Ord a) => Int -> (s -> a)
+  -> (s -> Bool) -> GameTree s i -> GameTree (s, Nat) i
+calcGuessedDepth width stateScore isWin = go
   where
-    (xs', candidates) = heuristicBranch width xs ys
-    winner = head [ x | maxDepth <- [1 .. ], x <- candidates, winsIn' maxDepth (xs', outcomes x ys) ]
-    winsIn' = winsIn respOpponent (heuristicPlayer width)
+    getScore = stateScore . fst . _gameState
+    getDepth = snd . _gameState
+    respScore = maximumOf getScore
+    limitResp = take width . sortOn (Down . getScore) . Map.elems
+    go (GameTree s playerMoves)
+      | isWin s = GameTree (s, Zero) []
+      | otherwise =
+          let playerMoves' = fmap (fmap (fmap go)) playerMoves
+              limitedPlayerMoves = take width $ sortOn respScore $ map snd playerMoves'
+              w = minimumNat $ maximumNat . fmap getDepth . limitResp <$> limitedPlayerMoves
+          in GameTree (s, Succ w) playerMoves'
 
-heuristicPlayer :: Collection Word i => Int -> ([i], Set i) -> [([i], Map Resp (Set i))]
-heuristicPlayer width (xs, ys)
-   | Set.size ys == 1 = [([y0], outcomes y0 ys)]
-   | otherwise        = xs' `listSeq` [ (xs', outcomes x ys) | x <- candidates ]
-  where
-    y0 = Set.findMin ys
-    (xs', candidates) = heuristicBranch width xs ys
+depthStrategy :: GameTree (s, Nat) i -> Strategy i
+depthStrategy (GameTree (_,d) moves) =
+  let moves' = [ (i, resp) | (i, resp) <- moves, all (\next -> snd (_gameState next) < d) resp ]
+   in case moves' of
+        [] -> AlreadyWon
+        (i,resp) : _ -> Strategy i (depthStrategy <$> resp)
 
-perfectPlayer :: Collection Word i => ([i], Set i) -> [([i], Map Resp (Set i))]
-perfectPlayer (xs, ys)
-  | Set.size ys == 1 = [([y0], outcomes y0 ys)]
-  | otherwise        = [(xs', outcomes x ys) | x <- xs']
+----------------------
+
+data GameState i = GameState { _moveCandidates :: [i], _solutionSet :: Set i }
+
+isWinState :: GameState i -> Bool
+isWinState GameState{ _solutionSet = ys } = Set.null ys
+
+makeGameTree :: Collection Word i => GameTree (GameState i) i
+makeGameTree = GameTree s0 firstMoves
   where
-    y0 = Set.findMin ys
-    xs' = trimMoves xs ys
+    ys = universe
+    xs = Set.toList ys
+    s0 = GameState xs ys
+    subTree ys' = makeGameTreeSub (GameState xs ys')
+    firstMoves = [ (x, subTree <$> resp) | x <- xs, let resp = outcomes x ys ]
+
+makeGameTreeSub :: Collection Word i => GameState i -> GameTree (GameState i) i
+makeGameTreeSub s@(GameState xs ys) = GameTree s nexts
+  where
+    moves = sortOn (scoreResp . snd) $ effectiveMoves xs ys
+    xs' = map fst moves
+    subTree ys' = makeGameTreeSub (GameState xs' ys')
+    nexts = [ (x, subTree <$> resp) | (x, resp) <- moves ]
+
+perfectStrategy :: forall i. Collection Word i => Strategy i
+perfectStrategy = perfectStrategyFrom makeGameTree
+
+perfectStrategyFrom :: Collection Word i => GameTree (GameState i) i -> Strategy i
+perfectStrategyFrom = recoverMissingStrat . iteratedDeepening isWinState 1
+
+recoverMissingStrat :: Collection Word i => Strategy i -> Strategy i
+recoverMissingStrat = go universe
+  where
+    xs0 = Set.toList universe
+    go ys strat = case strat of
+      AlreadyWon -> AlreadyWon
+      Strategy x plans -> Strategy x (repairWith plans (outcomes x ys))
+      where
+        coverUp plans k ys' =
+          case Map.lookup k plans of
+            Just nextStrat -> nextStrat
+            Nothing -> perfectStrategyFrom $ makeGameTreeSub (GameState xs0 ys')
+        repairWith plans = Map.mapWithKey (coverUp plans)
+
+iteratedDeepening :: (s -> Bool) -> Int -> GameTree s i -> Strategy i
+iteratedDeepening isWin depth tree =
+  case tryFindStrategyIn isWin depth tree of
+    Left tree' -> iteratedDeepening isWin (depth + 1) tree'
+    Right strat -> strat
+
+tryFindStrategyIn :: (s -> Bool) -> Int -> GameTree s i -> Either (GameTree s i) (Strategy i)
+tryFindStrategyIn isWin depth (GameTree s moves)
+  | isWin s    = Right AlreadyWon
+  | depth <= 0 = Left (GameTree s moves)
+  | otherwise = case partitionEithers (map splitMove moves) of
+      (moves', []) -> Left (GameTree s moves')
+      (_, (i, strat) : _) -> Right (Strategy i strat)
+  where
+    splitResps resp = case Map.mapEither (tryFindStrategyIn isWin (depth-1)) resp of
+      (misses, strat) | Map.null misses -> Right strat
+                      | otherwise       -> Left misses
+    splitMove (i, resp) = bimap (i,) (i,) (splitResps resp)
+
+
+heuristicStrategy :: forall i. Collection Word i => Int -> Strategy i
+heuristicStrategy width = depthStrategy $ calcGuessedDepth width (Set.size . _solutionSet) isWinState makeGameTree

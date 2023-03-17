@@ -16,7 +16,7 @@ executable list-nerdle
 executable wordle-solver
   hs-source-dirs: wordle-solver
   main-is: wordle-solver.hs
-  other-modules: Collection, WordleLike, Types, Util, Search
+  other-modules: Collection, WordleLike, Types, Util, Search, GameTree
   build-depends: base >= 4.14,
                  vector, containers, data-bag,
                  semialign,
