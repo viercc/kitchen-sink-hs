@@ -18,7 +18,7 @@ executable wordle-solver
   main-is: wordle-solver.hs
   other-modules: Collection, WordleLike, Types, Util, Search
   build-depends: base >= 4.14,
-                 vector, containers, data-bag,
+                 vector, containers, multiset,
                  semialign,
                  reflection,
                  random,

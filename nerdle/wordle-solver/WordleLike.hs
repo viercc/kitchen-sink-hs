@@ -9,7 +9,7 @@ module WordleLike(
 ) where
 
 import Prelude hiding (zip, zipWith)
-import Data.Bag qualified as Bag
+import Data.MultiSet qualified as Bag
 
 import Data.Traversable ( mapAccumL )
 import Data.Zip
@@ -21,6 +21,11 @@ data Response =
     | Miss -- ^ Grey in Wordle, no pegs in MasterMind
     deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
+pullOut :: Ord a => a -> Bag.MultiSet a -> Maybe (Bag.MultiSet a)
+pullOut x bag
+  | Bag.member x bag = Just (Bag.delete x bag)
+  | otherwise = Nothing
+
 -- @response answer query@
 response :: (Traversable v, Zip v, Ord char) => v char -> v char -> v Response
 response answer query = snd $ mapAccumL step letterCounts pairs
@@ -29,7 +34,7 @@ response answer query = snd $ mapAccumL step letterCounts pairs
     letterCounts = Bag.fromList [ x | (x,y) <- toList pairs, x /= y ]
     step lc (x,y)
       | x == y = (lc, Hit)
-      | otherwise = case Bag.pullOut y lc of
+      | otherwise = case pullOut y lc of
           Nothing  -> (lc, Miss)
           Just lc' -> (lc', Blow)
 
