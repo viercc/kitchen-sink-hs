@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
-module Monad.ProgramTransducer where
+module Monad.Transducer.Freer where
 
 import Data.IORef
 

@@ -1,8 +1,8 @@
 {-# LANGUAGE RankNTypes #-}
-module Monad.FTransducer where
+module Monad.Transducer.Free where
 
 import           Control.Monad
-import           Monad.Free
+import           Control.Monad.Free
 
 type Transducer f g = forall r. (g r -> r) -> f r -> r
 
@@ -60,7 +60,7 @@ composeTransducer :: Transducer f g -> Transducer g h -> Transducer f h
 composeTransducer fg gh = fg . gh
 
 idTransducer' :: (Functor f) => Transducer' f f
-idTransducer' = liftFree
+idTransducer' = liftF
 
 composeTransducer' ::
   (Functor h) => Transducer' f g -> Transducer' g h -> Transducer' f h

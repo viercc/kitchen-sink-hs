@@ -10,15 +10,12 @@ extra-source-files:  CHANGELOG.md README.md
 
 library
   hs-source-dirs:    src
-  exposed-modules:   Control.Monad.Queue,
-                     Monad.Free,
-                     Monad.FTransducer,
+  exposed-modules:   Monad.Queue,
                      Monad.FreeAny,
-                     Monad.IOCache,
                      Monad.Indexed,
                      Monad.Logger,
-                     Monad.ProgramTransducer,
-                     Monad.Ranked,
+                     Monad.Transducer.Freer,
+                     Monad.Transducer.Free,
                      Monad.Searchable,
                      Monad.SetMonad,
                      Monad.ShrinkOnce,

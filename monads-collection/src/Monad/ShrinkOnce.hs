@@ -6,8 +6,6 @@ module Monad.ShrinkOnce
   )
 where
 
-import Control.Applicative
-
 data Once a = Once
   { getDefault :: a,
     getVariants :: [a]

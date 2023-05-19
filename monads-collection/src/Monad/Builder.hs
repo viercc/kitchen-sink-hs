@@ -1,15 +1,10 @@
+{-
+
+https://stackoverflow.com/questions/59780866/creating-a-result-piecewise-from-stateful-computation-with-good-ergonomics
+
+-}
 {-# LANGUAGE BangPatterns #-}
-{-
-
-https://stackoverflow.com/questions/59780866/creating-a-result-piecewise-from-stateful-computation-with-good-ergonomics
-
--}
 {-# LANGUAGE DeriveFunctor #-}
-{-
-
-https://stackoverflow.com/questions/59780866/creating-a-result-piecewise-from-stateful-computation-with-good-ergonomics
-
--}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -24,6 +19,7 @@ where
 
 import Control.Monad.State
 import Data.Functor.Identity
+import Control.Monad (ap)
 
 -- | Lazy-for-s, strict-for-o state monad over (s,o)
 newtype Builder s o x = Builder

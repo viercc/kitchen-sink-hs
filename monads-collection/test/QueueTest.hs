@@ -2,7 +2,7 @@ module Main(
   main
 ) where
 
-import Control.Monad.Queue
+import Monad.Queue
 
 example1 :: Queue Char ()
 example1 = do

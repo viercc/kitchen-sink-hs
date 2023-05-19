@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BangPatterns #-}
-module Control.Monad.Queue(
+module Monad.Queue(
     Queue(),
     getLength,
     offer,
@@ -25,11 +25,10 @@ newtype Queue c a =
     deriving (Functor)
 
 instance Applicative (Queue c) where
-  pure = return
+  pure a = Queue $ \n is k -> k a n is
   (<*>) = ap
 
 instance Monad (Queue c) where
-  return a = Queue $ \n is k -> k a n is
   qa >>= f = Queue $ \n is k ->
     unQueue qa n is $ \a n' is' ->
       unQueue (f a) n' is' k
