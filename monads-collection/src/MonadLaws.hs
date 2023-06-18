@@ -13,7 +13,6 @@ module MonadLaws
   )
 where
 
-import Control.Monad (join)
 import Control.Applicative
 import Control.Monad.State
 import Data.Functor.Compose
