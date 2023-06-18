@@ -20,13 +20,17 @@ common warnings
 library
     import:           warnings
     exposed-modules: 
-        Category,
-        Category.Trivial,
-        Category.Sum,
-        Category.Product,
-        Category.WithOb,
-        FunctorOf,
-        Data.Type.Relation
+        Concrete.Decision,
+        Concrete.Span,
+        Concrete.Span.Compose,
+        Concrete.Category,
+        Concrete.Category.Zero,
+        Concrete.Category.One,
+        Concrete.Category.Discrete,
+        Concrete.Category.Indiscrete,
+        Concrete.Category.Sum,
+        Concrete.Category.Product,
+        Concrete.FunctorOf
     -- other-modules:
     -- other-extensions:
     
