@@ -7,7 +7,7 @@
 module Concrete.FunctorOf where
 
 import Concrete.Span
-import Concrete.Category
+import Concrete.Category ( Category, Ob )
 
 import Concrete.Span.Compose
 import Concrete.Category.Discrete

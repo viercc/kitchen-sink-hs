@@ -9,12 +9,11 @@ module Concrete.Span(
 ) where
 
 import Data.Kind
-import Concrete.Decision
 import Data.Type.Equality ((:~:)(..))
 import Data.Some (Some(..))
 
 type Span :: (j -> Type) -> (k -> Type) -> (j -> k -> Type) -> Constraint
-class (Deq s, Deq t) => Span s t f | f -> s t where
+class Span s t f | f -> s t where
     dom :: f a b -> s a
     cod :: f a b -> t b
 

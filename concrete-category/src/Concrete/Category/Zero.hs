@@ -8,8 +8,8 @@
 module Concrete.Category.Zero where
 
 import Data.Kind
+import GHC.Generics(V1())
 
-import Concrete.Decision
 import Concrete.Span
 import Concrete.Category
 
@@ -17,7 +17,7 @@ type Zero :: (j -> Type) -> (k -> Type) -> j -> k -> Type
 data Zero s t a b
     deriving (Show, Eq, Ord)
 
-instance (Deq s, Deq t) => Span s t (Zero s t) where
+instance Span s t (Zero s t) where
     dom z = case z of {}
     cod z = case z of {}
 

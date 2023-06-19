@@ -20,7 +20,10 @@ common warnings
 library
     import:           warnings
     exposed-modules: 
-        Concrete.Decision,
+        Type.Decision,
+        Type.Decision.Eq,
+        Concrete.Object.Sum,
+        Concrete.Object.Product,
         Concrete.Span,
         Concrete.Span.Compose,
         Concrete.Category,
