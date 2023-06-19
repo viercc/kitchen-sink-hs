@@ -4,6 +4,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE GADTs #-}
 module Concrete.FunctorOf where
 
 import Concrete.Span
@@ -11,8 +16,10 @@ import Concrete.Category ( Category, Ob )
 
 import Concrete.Span.Compose
 import Concrete.Category.Discrete
+import Data.Kind
 
-class (Function (Ob c) (Ob d) f) => FunctorOf c d f | f c -> d, f d -> c where
+type FunctorOf :: (j -> j -> Type) -> (k -> k -> Type) -> (j -> k -> Type) -> Constraint
+class (Function f, Dom f ~ Ob c, Cod f ~ Ob d) => FunctorOf c d f | f c -> d, f d -> c where
     fmapAt :: f a fa -> f b fb -> c a b -> d fa fb
 
 instance (Category c, s ~ Ob c) => FunctorOf c c (Diag s) where
@@ -22,3 +29,7 @@ type Id c = Diag (Ob c)
 
 instance (FunctorOf c d f, FunctorOf d e g) => FunctorOf c e (Compose f g) where
     fmapAt (Compose fa gfa) (Compose fb gfb) ab = fmapAt gfa gfb (fmapAt fa fb ab)
+
+data Transformation f g d a where
+    Transformation :: f a fa -> g a ga -> d fa ga -> Transformation f g d a
+

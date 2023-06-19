@@ -22,15 +22,15 @@ deriving instance Show (s b) => Show (Diag s b c)
 deriving instance Eq (s b) => Eq (Diag s b c)
 deriving instance Ord (s b) => Ord (Diag s b c)
 
-instance Span s s (Diag s) where
+instance Span (Diag s) where
+    type Dom (Diag s) = s
+    type Cod (Diag s) = s
     dom (Diag a) = a
     cod (Diag a) = a
 
-instance Function s s (Diag s) where
+instance Function (Diag s) where
     isFunction (Diag _) (Diag _) = Refl
     apply a = Some (Diag a)
-
-type instance Ob (Diag s) = s
 
 instance Category (Diag s) where
     ident = Diag

@@ -17,13 +17,13 @@ type Zero :: (j -> Type) -> (k -> Type) -> j -> k -> Type
 data Zero s t a b
     deriving (Show, Eq, Ord)
 
-instance Span s t (Zero s t) where
+instance Span (Zero s t) where
+    type Dom (Zero s t) = s
+    type Cod (Zero s t) = t
     dom z = case z of {}
     cod z = case z of {}
 
 type Zero' = Zero V1 V1
-
-type instance Ob (Zero V1 V1) = V1
 
 instance Category Zero' where
     ident z = case z of {}

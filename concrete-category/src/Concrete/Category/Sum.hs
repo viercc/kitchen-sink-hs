@@ -23,14 +23,23 @@ data Sum c d a b where
   Lmor :: c a b -> Sum c d ('Left a) ('Left b)
   Rmor :: d a b -> Sum c d ('Right a) ('Right b)
 
-instance (Span ca cb c, Span da db d) => Span (ca :+: da) (cb :+: db) (Sum c d) where
+instance (Span c, Span d) => Span (Sum c d) where
+  type Dom (Sum c d) = Dom c :+: Dom d
+  type Cod (Sum c d) = Cod c :+: Cod d
   dom (Lmor x) = Lob (dom x)
   dom (Rmor x) = Rob (dom x)
 
   cod (Lmor x) = Lob (cod x)
   cod (Rmor x) = Rob (cod x)
 
-type instance Ob (Sum c d) = Ob c :+: Ob d
+instance (Function c, Function d) => Function (Sum c d) where
+  isFunction (Lmor ab) (Lmor ab') = case isFunction ab ab' of Refl -> Refl
+  isFunction (Rmor ab) (Rmor ab') = case isFunction ab ab' of Refl -> Refl
+
+  apply (Lob a) = case apply a of
+    Some cab -> Some (Lmor cab)
+  apply (Rob a) = case apply a of
+    Some dab -> Some (Rmor dab)
 
 instance (Category c, Category d) => Category (Sum c d) where
   ident (Lob a) = Lmor (ident a)

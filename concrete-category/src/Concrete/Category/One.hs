@@ -20,15 +20,15 @@ deriving instance Show (One a b c)
 deriving instance Eq (One a b c)
 deriving instance Ord (One a b c)
 
-instance Span ((:~:) a) ((:~:) a) (One a) where
+instance Span (One a) where
+    type Dom (One a) = ((:~:) a)
+    type Cod (One a) = ((:~:) a)
     dom One = Refl
     cod One = Refl
 
-instance Function ((:~:) a) ((:~:) a) (One a) where
+instance Function (One a) where
     isFunction One One = Refl
     apply Refl = Some One
-
-type instance Ob (One a) = ((:~:) a)
 
 instance Category (One a) where
     ident Refl = One

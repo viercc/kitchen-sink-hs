@@ -22,11 +22,11 @@ type Product ::
 data Product c d a b where
   Pmor :: c a b -> d a' b' -> Product c d '(a, a') '(b, b')
 
-instance (Span ca cb c, Span da db d) => Span (ca :*: da) (cb :*: db) (Product c d) where
+instance (Span c, Span d) => Span (Product c d) where
+  type Dom (Product c d) = Dom c :*: Dom d
+  type Cod (Product c d) = Cod c :*: Cod d
   dom (Pmor x y) = Pob (dom x) (dom y)
   cod (Pmor x y) = Pob (cod x) (cod y)
-
-type instance Ob (Product c d) = Ob c :*: Ob d
 
 instance (Category c, Category d) => Category (Product c d) where
   ident (Pob a a') = Pmor (ident a) (ident a')

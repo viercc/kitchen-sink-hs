@@ -15,18 +15,19 @@ import Data.Proxy
 import Concrete.Span
 import Concrete.Category
 
--- | Wraps a type with an instance of 'Std.Category' (which is the one in the standard library)
---   to give it an 'Category' instance. The new instance uses 'Proxy' as the tag with no data.
+-- | Wraps a type with an instance of 'Std.Category' (the one in the standard library)
+--   to give it a 'Category' instance. The new instance uses 'Proxy' as the tag,
+--   which carries with no additional data.
 type Untagged :: (j -> k -> Type) -> (j -> k -> Type)
 newtype Untagged p a b = Untagged { getUntagged :: p a b }
    deriving (Eq, Ord, Show)
    deriving newtype (Functor, Applicative, Monad, Std.Category)
 
-instance Span Proxy Proxy (Untagged p) where
+instance Span (Untagged p) where
+    type Dom (Untagged p) = Proxy
+    type Cod (Untagged p) = Proxy
     dom _ = Proxy
     cod _ = Proxy
-
-type instance Ob (Untagged p) = Proxy
 
 instance Std.Category p => Category (Untagged p) where
     ident _ = Untagged Std.id

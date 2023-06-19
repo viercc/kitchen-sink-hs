@@ -2,18 +2,19 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
 module Concrete.Category where
 
 import Concrete.Span
 
 import Data.Kind
 
-type family Ob (cat :: k -> k -> Type) :: k -> Type
-
 type Category :: (k -> k -> Type) -> Constraint
-class (Span (Ob cat) (Ob cat) cat) => Category cat where
+class (Span cat, Dom cat ~ Cod cat) => Category (cat :: k -> k -> Type) where
     ident :: Ob cat a -> cat a a
     compose :: cat a b -> cat b c -> cat a c
+
+type Ob cat = Dom cat
 
 infixr 2 >>>
 
