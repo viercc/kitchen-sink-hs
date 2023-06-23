@@ -25,3 +25,7 @@ infixr 2 <<<
 
 (<<<) :: (Category hom) => hom b c -> hom a b -> hom a c
 (<<<) = flip compose
+
+instance Category (->) where
+    ident _ = id
+    compose x y = y . x

@@ -32,6 +32,11 @@ class (Span p, Category c, Category d, Dom p ~ Ob c, Cod p ~ Ob d) => Profunctor
     dimap :: c a' a -> d b b' -> p a b -> p a' b'
     dimap f g = lmap f . rmap g
 
+instance Profunctor (->) (->) (->) where
+    lmap = (>>>)
+    rmap = (<<<)
+    dimap f g h = f >>> h >>> g
+
 newtype Hom c a b = Hom { getHom :: c a b }
     deriving newtype (Span, Category)
 
