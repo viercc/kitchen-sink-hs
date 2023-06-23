@@ -33,7 +33,10 @@ library
         Concrete.Category.Indiscrete,
         Concrete.Category.Sum,
         Concrete.Category.Product,
-        Concrete.FunctorOf
+        Concrete.Category.Untagged,
+        Concrete.FunctorOf,
+        Concrete.Profunctor,
+        Concrete.Profunctor.Rep
     -- other-modules:
     -- other-extensions:
     
