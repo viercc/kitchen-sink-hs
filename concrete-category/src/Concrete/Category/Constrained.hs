@@ -20,8 +20,8 @@ data Restrict con c a b where
     Restricted :: (con a, con b) => c a b -> Restrict con c a b
 
 instance Span c => Span (Restrict con c) where
-    type Dom (Restrict con c) = con :=>: Dom c
-    type Cod (Restrict con c) = con :=>: Cod c
+    type Dom (Restrict con c) = con :&: Dom c
+    type Cod (Restrict con c) = con :&: Cod c
 
     dom (Restricted x) = RestrictedOb (dom x)
     cod (Restricted x) = RestrictedOb (cod x)

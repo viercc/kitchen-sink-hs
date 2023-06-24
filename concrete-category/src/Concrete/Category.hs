@@ -3,7 +3,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
-module Concrete.Category where
+module Concrete.Category(
+    Span(..),
+    Ob,
+    Category(..),
+
+    (>>>), (<<<)
+) where
 
 import Concrete.Span
 

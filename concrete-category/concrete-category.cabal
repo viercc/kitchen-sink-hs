@@ -22,8 +22,10 @@ library
     exposed-modules: 
         Type.Decision,
         Type.Decision.Eq,
+        Concrete.Object,
         Concrete.Object.Sum,
         Concrete.Object.Product,
+        Concrete.Object.Constrained,
         Concrete.Span,
         Concrete.Span.Compose,
         Concrete.Category,

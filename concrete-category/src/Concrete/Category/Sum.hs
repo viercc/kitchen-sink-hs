@@ -7,7 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeOperators #-}
-module Concrete.Category.Sum where
+module Concrete.Category.Sum(Sum(..), (:+:)(..)) where
 
 import Data.Kind (Type)
 
@@ -15,6 +15,17 @@ import Concrete.Object.Sum
 import Concrete.Span
 import Concrete.Category
 
+-- | Sum of two categories.
+--
+-- >>> :kind Sum
+-- Sum :: (j -> j' -> *)
+--        -> (k -> k' -> *) -> Either j k -> Either j' k' -> *
+-- >>> :kind! Dom (Sum c d)
+-- Dom (Sum c d) :: Either j k -> *
+-- = Dom c :+: Dom d
+-- >>> :kind! Cod (Sum c d)
+-- Cod (Sum c d) :: Either j' k' -> *
+-- = Cod c :+: Cod d
 type Sum ::
   (j -> j' -> Type) ->
   (k -> k' -> Type) ->
