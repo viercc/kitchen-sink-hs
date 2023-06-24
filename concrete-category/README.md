@@ -1,3 +1,0 @@
-# concrete-category
-
-wip
