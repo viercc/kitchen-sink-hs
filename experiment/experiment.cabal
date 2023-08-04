@@ -70,7 +70,7 @@ library
                      , profunctors
                      , comonad
                      , kan-extensions
---                   , some
+                     , some
                      
                      , lattices
   ghc-options:       -Wall -Wcompat
