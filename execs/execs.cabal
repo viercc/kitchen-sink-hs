@@ -63,3 +63,9 @@ executable readwrite
   build-depends:  base >= 4.10, process
   main-is: readwrite.hs
 
+
+executable prof-sequence-m
+  import: ghcopt
+  hs-source-dirs: sequence-m
+  main-is: Main.hs
+  build-depends:  base >= 4.10
