@@ -20,19 +20,23 @@ import           Text.Read.Lex
 newtype Cardinality = C Word
   deriving (Eq, Ord, Enum, Bounded)
 
+infWord, overflowedWord :: Word
+infWord = maxBound
+overflowedWord = pred maxBound
+
 pattern Infty :: Cardinality
-pattern Infty <- C ((== maxBound) -> True)
+pattern Infty <- C ((== infWord) -> True)
           where Infty = C maxBound
 
 pattern Overflowed :: Cardinality
-pattern Overflowed <- C ((== pred maxBound) -> True)
-          where Overflowed = C (pred maxBound)
+pattern Overflowed <- C ((== overflowedWord) -> True)
+          where Overflowed = C overflowedWord
 
 pattern Card :: Word -> Cardinality
-pattern Card n <- C (checkOF -> Just n)
-          where Card n = case checkOF n of
-                  Nothing -> error "Too large for finite Card"
-                  Just n' -> C n
+pattern Card n <- C (fromWord -> Just (C n))
+          where Card n = case fromWord n of
+                  Nothing -> error $ "Too large for a finite Card:" ++ show n
+                  Just n' -> n'
 
 {-# COMPLETE C #-}
 {-# COMPLETE Infty, Overflowed, Card #-}
@@ -49,13 +53,19 @@ cardinalityParser :: ReadPrec Cardinality
 cardinalityParser =
   wrap (Infty <$ expect (Ident "Infty")) <++
   wrap (Overflowed <$ expect (Ident "Overflowed")) <++
-  (checkOF <$> (readPrec :: ReadPrec Word))
+  (clip <$> (readPrec :: ReadPrec Word))
   where
     wrap = readP_to_Prec . const
 
--- check overflow
-checkOF :: Word -> Cardinality
-checkOF c = C (min (pred maxBound) c)
+-- convert from Word
+fromWord :: Word -> Maybe Cardinality
+fromWord n | n < overflowedWord = Just (C n)
+           | otherwise          = Nothing
+
+-- Make a Word at most 'overflowedWord'
+-- (@clip c@ is guaranteed to be smaller than @Infty@)
+clip :: Word -> Cardinality
+clip c = C (min overflowedWord c)
 
 negativeError :: a
 negativeError = error "Cardinality:Negative"
@@ -89,8 +99,8 @@ instance Num Cardinality where
   -- It is not needed to handle Overflowed specially
   C a        + C b        =
     case addWordF a b of
-      (_, True)  ->  Overflowed
-      (c, False) -> checkOF c
+      (_, True)  -> Overflowed
+      (c, False) -> clip c
 
   Infty      * 0          = error "Infty * 0"
   Infty      * _          = Infty
@@ -100,7 +110,7 @@ instance Num Cardinality where
   C a        * C b =
     case timesWordF a b of
       (_, True)  -> Overflowed
-      (c, False) -> checkOF c
+      (c, False) -> clip c
 
   (-) = error "Subtraction is not possible"
   negate = error "Negation is not possible"
