@@ -40,7 +40,9 @@ library
 
                    Isomorphisms, Isomorphisms2,
 
-                   Combinatorics
+                   Combinatorics,
+
+                   MergedHead
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
