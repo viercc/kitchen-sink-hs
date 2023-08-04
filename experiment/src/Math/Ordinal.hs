@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf   #-}
-module Ordinal(
+module Math.Ordinal(
   CNF(),
   omega,
   OrdinalView(..),

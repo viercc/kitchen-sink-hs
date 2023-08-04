@@ -1,6 +1,6 @@
-module CountCoSemigroup where
+module Math.CountCoSemigroup where
 
-import Combinatorics (partitions, uniquePointedContigencyTables)
+import Math.Combinatorics (partitions, uniquePointedContigencyTables)
 import Data.List (group)
 import qualified Data.MemoCombinators as Memo
 

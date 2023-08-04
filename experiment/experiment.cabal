@@ -11,38 +11,39 @@ extra-source-files:  README.md
 
 library
   hs-source-dirs:  src
-  exposed-modules: AdHocInstances,Heap, 
-                   Newtypes, CheapRecord, CoerceUnder,
+  exposed-modules: AdHocInstances, AmbiguousExistential,
+                   Newtypes, Cardinality, CheapRecord, CoerceUnder,
                    LCS,
-                   Co,
                    
-                   AdditionChain, Cardinality,
-                   KrohnRhodes,
-                   Ordinal,
+                   Math.AdditionChain,
+                   Math.Combinatorics,
+                   Math.CountCoSemigroup,
+                   Math.Ordinal,
+                   Math.KrohnRhodes,
 
-                   DifferenceApplicative,
-                   Distributive,
+                   Co,
 
-                   HeytingApplicative, HMatchable, Hoard,
-                   Rank2Unzip,
+                   Applicative.Heyting,
+                   Applicative.Hoard,
+                   Applicative.MergedHead,
+                   Applicative.LmfContainer,
+
+                   Rank2.Unzip,
+                   HMatchable,
                    
                    Partial.Monad,
                    Partial.Monoidal,
                    Partial.Poifree,
 
-                   TheseChain,
-
                    Selective.Prism, Selective.Night,
 
                    Data.Set.Extra, Data.PureSet, Data.PureSet.Compact,
+                   Data.FiniteSet,
+                   Data.Functor.Derivative,
 
                    TreesThatGrow,
-
                    Isomorphisms, Isomorphisms2,
-
-                   Combinatorics,
-
-                   MergedHead, LmfContainer
+                   TheseChain,
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
@@ -65,12 +66,11 @@ library
                      
                      , transformers
                      , mtl
-                     , free
+--                   , free
                      , profunctors
                      , comonad
                      , kan-extensions
-                     , hyperfunctions
-                     , some
+--                   , some
                      
                      , lattices
   ghc-options:       -Wall -Wcompat

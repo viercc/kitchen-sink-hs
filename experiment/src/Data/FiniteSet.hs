@@ -1,4 +1,4 @@
-module FiniteSet where
+module Data.FiniteSet where
 
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.Ordered as OL

@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeOperators #-}
-module Rank2Unzip where
+module Rank2.Unzip where
 
 import qualified Rank2
 import Rank2 (Only(..))

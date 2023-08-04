@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingVia #-}
-module HeytingApplicative where
+module Applicative.Heyting where
 
 import Data.Monoid (Ap(..))
 import Lattice

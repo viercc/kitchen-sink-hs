@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
-module Hoard where
+module Applicative.Hoard where
 
 import Data.Set (Set)
 import qualified Data.Set as Set

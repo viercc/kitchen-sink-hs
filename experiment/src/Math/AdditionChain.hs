@@ -1,4 +1,4 @@
-module AdditionChain where
+module Math.AdditionChain where
 
 import Data.Ord (comparing)
 import Data.List (sortBy)

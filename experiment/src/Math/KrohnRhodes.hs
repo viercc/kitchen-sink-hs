@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module KrohnRhodes where
+module Math.KrohnRhodes where
 
 import Control.Monad.State
 import Data.Bifunctor

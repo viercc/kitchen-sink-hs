@@ -6,7 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE RankNTypes #-}
-module LmfContainer where
+module Applicative.LmfContainer where
 
 import Data.Kind (Type)
 import Data.Type.Equality

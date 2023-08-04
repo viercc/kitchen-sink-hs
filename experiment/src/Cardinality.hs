@@ -8,6 +8,7 @@ module Cardinality(
   Cardinality(),
   pattern Infty,
   pattern Overflowed,
+  pattern Card,
   toInt)
 where
 
@@ -27,7 +28,14 @@ pattern Overflowed :: Cardinality
 pattern Overflowed <- C ((== pred maxBound) -> True)
           where Overflowed = C (pred maxBound)
 
+pattern Card :: Word -> Cardinality
+pattern Card n <- C (checkOF -> Just n)
+          where Card n = case checkOF n of
+                  Nothing -> error "Too large for finite Card"
+                  Just n' -> C n
+
 {-# COMPLETE C #-}
+{-# COMPLETE Infty, Overflowed, Card #-}
 
 instance Show Cardinality where
   show Infty      = "Infty"

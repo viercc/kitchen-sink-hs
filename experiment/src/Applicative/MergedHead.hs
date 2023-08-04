@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
-module MergedHead where
+module Applicative.MergedHead where
 
 import Data.List.NonEmpty (NonEmpty(..))
 

@@ -1,4 +1,4 @@
-module Combinatorics where
+module Math.Combinatorics where
 
 import Data.Function (on)
 import Data.List (groupBy, permutations, intercalate)
