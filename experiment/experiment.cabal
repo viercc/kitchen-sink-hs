@@ -42,7 +42,7 @@ library
 
                    Combinatorics,
 
-                   MergedHead
+                   MergedHead, LmfContainer
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
                      , reflection
@@ -70,6 +70,7 @@ library
                      , comonad
                      , kan-extensions
                      , hyperfunctions
+                     , some
                      
                      , lattices
   ghc-options:       -Wall -Wcompat
