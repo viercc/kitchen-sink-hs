@@ -29,7 +29,6 @@ library
                    Applicative.LmfContainer,
 
                    Rank2.Unzip,
-                   HMatchable,
                    
                    Partial.Monad,
                    Partial.Monoidal,
