@@ -24,7 +24,6 @@ library
     build-depends:
         base >=4.14 && <4.20,
         some,
-        dependent-map,
         functor-combinators,
         matchable
     hs-source-dirs:   src
@@ -39,8 +38,7 @@ executable try-typed-patterns
         base ^>=4.18.1.0,
         functor-combinators,
         hmatchable,
-        some,
-        dependent-map
+        some
 
     hs-source-dirs:   app
     default-language: Haskell2010
