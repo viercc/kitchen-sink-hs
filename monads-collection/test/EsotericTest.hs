@@ -15,5 +15,7 @@ main =
   do checkMonadIO enumSpan >>= tested
      checkMonadIO enumGold >>= tested
      checkMonadIO enumTwist >>= tested
+     checkMonadIO enumTwist' >>= tested
+     tested $ all (\mma -> joinTwist' mma == joinTwist'viaIso mma) (skolem2 enumTwist')
      checkMonadIO enumNezzle >>= tested
      checkMonadIO enumOdd >>= tested

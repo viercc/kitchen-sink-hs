@@ -1,17 +1,16 @@
 {-# LANGUAGE DeriveTraversable #-}
-{-
+{-# LANGUAGE DerivingVia #-}
+
+{- |
 
 This module is a collection of weird, unusual
 kinds of Monad instances.
 
 -}
-{-# LANGUAGE DerivingVia #-}
-
 module Monad.Esoteric where
 
 import Control.Applicative
-import Control.Monad (ap)
-import Data.Foldable
+import Control.Monad (ap, join)
 import Data.List (unfoldr)
 
 -- These are found by exhaustively searching
@@ -90,38 +89,96 @@ instance Monad Twist where
 enumTwist :: (Alternative f) => f a -> f (Twist a)
 enumTwist as = T <$> (pure True <|> pure False) <*> as <*> as
 
---------------------------------
-
--- Non empty zip(ish)-list.
--- by treating finite list as "converging" sequence.
--- By "converging", I mean, it repeats same value after
--- finite elements.
-
-data Nezzle a = a :| [a]
+-- Twist'
+data Twist' a = T' Bool a a
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
 
-headNezzle :: Nezzle a -> a
-headNezzle (a :| _) = a
+isoTT' :: Twist a -> Twist' a
+isoTT' (T b x0 x1) = if b then T' b x1 x0 else T' b x0 x1
 
-tailNezzle :: Nezzle a -> Nezzle a
-tailNezzle (_ :| (a : as)) = a :| as
-tailNezzle single = single
+isoT'T :: Twist' a -> Twist a
+isoT'T (T' b x0 x1) = if b then T b x1 x0 else T b x0 x1
 
-instance Applicative Nezzle where
-  pure a = a :| []
+instance Applicative Twist' where
+  pure a = T' False a a
   (<*>) = ap
 
-instance Monad Nezzle where
-  a :| [] >>= k = k a
-  a :| (a' : as) >>= k =
-    headNezzle (k a) :| toList ((a' :| as) >>= tailNezzle . k)
+{-
+Transfer the instance Monad Twist via isoTT'
+
+join' (T' b (T' c x0 x1) (T' d x10 x11))
+ = isoTT' $ join . isoT'T . fmap isoT'T $ (T' b (T' c x00 x01) (T' d x10 x11))
+ = case (b,c,d) of
+     (False, False, False) -> isoTT' $ join $ T False (T False x00 x01) (T False x10 x11)
+     (False, False, True)  -> isoTT' $ join $ T False (T False x00 x01) (T True  x11 x10)
+     (False, True,  False) -> isoTT' $ join $ T False (T True  x01 x00) (T False x10 x11)
+     (False, True,  True)  -> isoTT' $ join $ T False (T True  x01 x00) (T True  x11 x10)
+     (True,  False, False) -> isoTT' $ join $ T True  (T False x10 x11) (T False x00 x01)
+     (True,  False, True)  -> isoTT' $ join $ T True  (T True  x11 x10) (T False x00 x01)
+     (True,  True,  False) -> isoTT' $ join $ T True  (T False x10 x11) (T True  x01 x00)
+     (True,  True,  True)  -> isoTT' $ join $ T True  (T True  x11 x10) (T True  x01 x00)
+ = case (b,c,d) of
+     (False, False, False) -> isoTT' $ T False x00 x11
+     (False, False, True)  -> isoTT' $ T False x00 x11
+     (False, True,  False) -> isoTT' $ T True  x11 x00
+     (False, True,  True)  -> isoTT' $ T True  x11 x00
+     (True,  False, False) -> isoTT' $ T True  x11 x00
+     (True,  False, True)  -> isoTT' $ T True  x11 x00
+     (True,  True,  False) -> isoTT' $ T True  x11 x00
+     (True,  True,  True)  -> isoTT' $ T True  x11 x00
+ = case (b,c,d) of
+     (False, False, False) -> T' False x00 x11
+     (False, False, True)  -> T' False x00 x11
+     (False, True,  False) -> T' True  x00 x11
+     (False, True,  True)  -> T' True  x00 x11
+     (True,  False, False) -> T' True  x00 x11
+     (True,  False, True)  -> T' True  x00 x11
+     (True,  True,  False) -> T' True  x00 x11
+     (True,  True,  True)  -> T' True  x00 x11
+-}
+instance Monad Twist' where
+  ma >>= k = joinTwist' $ fmap k ma
+
+joinTwist' :: Twist' (Twist' a) -> Twist' a
+joinTwist' (T' b (T' c x00 _) (T' _ _ x11)) = T' (b || c) x00 x11
+
+joinTwist'viaIso :: Twist' (Twist' a) -> Twist' a
+joinTwist'viaIso = isoTT' . join . isoT'T . fmap isoT'T
+
+enumTwist' :: (Alternative f) => f a -> f (Twist' a)
+enumTwist' as = T' <$> (pure True <|> pure False) <*> as <*> as
+
+--------------------------------
+
+-- Nonempty zip(ish)-list, by treating finite list as "converging" sequence.
+-- By "converging", I mean, it repeats the same value after finite elements.
+
+data Nez a = Last a | ConsNez a (Nez a)
+  deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
+
+headNezzle :: Nez a -> a
+headNezzle (Last a) = a
+headNezzle (ConsNez a _) = a
+
+tailNezzle :: Nez a -> Nez a
+tailNezzle (Last a) = Last a
+tailNezzle (ConsNez _ as) = as
+
+instance Applicative Nez where
+  pure = Last
+  (<*>) = ap
+
+instance Monad Nez where
+  Last a >>= k = k a
+  ConsNez a as >>= k =
+    ConsNez (headNezzle (k a)) (as >>= tailNezzle . k)
 
 -- Not exhaustive; only up to length 3
-enumNezzle :: (Alternative f) => f a -> f (Nezzle a)
-enumNezzle as = (:|) <$> as <*> s (s nil)
+enumNezzle :: (Alternative f) => f a -> f (Nez a)
+enumNezzle as = s (s one)
   where
-    nil = pure []
-    s n = pure [] <|> (:) <$> as <*> n
+    one = Last <$> as
+    s n = one <|> (ConsNez <$> as <*> n)
 
 --------------------------------
 

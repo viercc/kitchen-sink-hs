@@ -3,8 +3,7 @@
 
 module MonadLaws
   ( Enum1,
-    skolem1,
-    skolem3,
+    skolem1, skolem2, skolem3,
     propMonadUnitL,
     propMonadUnitR,
     propMonadAssoc,
@@ -14,8 +13,9 @@ module MonadLaws
 where
 
 import Control.Applicative
-import Control.Monad.State
-import Data.Functor.Compose
+import Control.Monad (join)
+import Control.Monad.State ( evalState, MonadState(state), State )
+import Data.Functor.Compose ( Compose(..) )
 
 type Enum1 m = forall f a. (Alternative f) => f a -> f (m a)
 
@@ -31,6 +31,9 @@ eval = fmap (flip evalState 0) . getCompose
 
 skolem1 :: Enum1 m -> [m Var]
 skolem1 enum1 = eval $ enum1 var
+
+skolem2 :: Enum1 m -> [m (m Var)]
+skolem2 enum1 = eval $ enum1 (enum1 var)
 
 skolem3 :: Enum1 m -> [m (m (m Var))]
 skolem3 enum1 = eval $ enum1 (enum1 (enum1 var))
