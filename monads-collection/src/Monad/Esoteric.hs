@@ -93,39 +93,35 @@ enumTwist as = T <$> (pure True <|> pure False) <*> as <*> as
 data Twist' a = T' Bool a a
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
 
-isoTT' :: Twist a -> Twist' a
-isoTT' (T b x0 x1) = if b then T' b x1 x0 else T' b x0 x1
-
-isoT'T :: Twist' a -> Twist a
-isoT'T (T' b x0 x1) = if b then T b x1 x0 else T b x0 x1
-
-instance Applicative Twist' where
-  pure a = T' False a a
-  (<*>) = ap
-
 {-
 Transfer the instance Monad Twist via isoTT'
 
+to' :: Twist a -> Twist' a
+to' (T b x0 x1) = if b then T' b x1 x0 else T' b x0 x1
+
+from' :: Twist' a -> Twist a
+from' (T' b x0 x1) = if b then T b x1 x0 else T b x0 x1
+
 join' (T' b (T' c x0 x1) (T' d x10 x11))
- = isoTT' $ join . isoT'T . fmap isoT'T $ (T' b (T' c x00 x01) (T' d x10 x11))
+ = to' $ join . from' . fmap from' $ (T' b (T' c x00 x01) (T' d x10 x11))
  = case (b,c,d) of
-     (False, False, False) -> isoTT' $ join $ T False (T False x00 x01) (T False x10 x11)
-     (False, False, True)  -> isoTT' $ join $ T False (T False x00 x01) (T True  x11 x10)
-     (False, True,  False) -> isoTT' $ join $ T False (T True  x01 x00) (T False x10 x11)
-     (False, True,  True)  -> isoTT' $ join $ T False (T True  x01 x00) (T True  x11 x10)
-     (True,  False, False) -> isoTT' $ join $ T True  (T False x10 x11) (T False x00 x01)
-     (True,  False, True)  -> isoTT' $ join $ T True  (T True  x11 x10) (T False x00 x01)
-     (True,  True,  False) -> isoTT' $ join $ T True  (T False x10 x11) (T True  x01 x00)
-     (True,  True,  True)  -> isoTT' $ join $ T True  (T True  x11 x10) (T True  x01 x00)
+     (False, False, True)  -> to' $ join $ T False (T False x00 x01) (T True  x11 x10)
+     (False, False, False) -> to' $ join $ T False (T False x00 x01) (T False x10 x11)
+     (False, True,  False) -> to' $ join $ T False (T True  x01 x00) (T False x10 x11)
+     (False, True,  True)  -> to' $ join $ T False (T True  x01 x00) (T True  x11 x10)
+     (True,  False, False) -> to' $ join $ T True  (T False x10 x11) (T False x00 x01)
+     (True,  False, True)  -> to' $ join $ T True  (T True  x11 x10) (T False x00 x01)
+     (True,  True,  False) -> to' $ join $ T True  (T False x10 x11) (T True  x01 x00)
+     (True,  True,  True)  -> to' $ join $ T True  (T True  x11 x10) (T True  x01 x00)
  = case (b,c,d) of
-     (False, False, False) -> isoTT' $ T False x00 x11
-     (False, False, True)  -> isoTT' $ T False x00 x11
-     (False, True,  False) -> isoTT' $ T True  x11 x00
-     (False, True,  True)  -> isoTT' $ T True  x11 x00
-     (True,  False, False) -> isoTT' $ T True  x11 x00
-     (True,  False, True)  -> isoTT' $ T True  x11 x00
-     (True,  True,  False) -> isoTT' $ T True  x11 x00
-     (True,  True,  True)  -> isoTT' $ T True  x11 x00
+     (False, False, False) -> to' $ T False x00 x11
+     (False, False, True)  -> to' $ T False x00 x11
+     (False, True,  False) -> to' $ T True  x11 x00
+     (False, True,  True)  -> to' $ T True  x11 x00
+     (True,  False, False) -> to' $ T True  x11 x00
+     (True,  False, True)  -> to' $ T True  x11 x00
+     (True,  True,  False) -> to' $ T True  x11 x00
+     (True,  True,  True)  -> to' $ T True  x11 x00
  = case (b,c,d) of
      (False, False, False) -> T' False x00 x11
      (False, False, True)  -> T' False x00 x11
@@ -136,17 +132,28 @@ join' (T' b (T' c x0 x1) (T' d x10 x11))
      (True,  True,  False) -> T' True  x00 x11
      (True,  True,  True)  -> T' True  x00 x11
 -}
-instance Monad Twist' where
-  ma >>= k = joinTwist' $ fmap k ma
 
 joinTwist' :: Twist' (Twist' a) -> Twist' a
 joinTwist' (T' b (T' c x00 _) (T' _ _ x11)) = T' (b || c) x00 x11
 
 joinTwist'viaIso :: Twist' (Twist' a) -> Twist' a
-joinTwist'viaIso = isoTT' . join . isoT'T . fmap isoT'T
+joinTwist'viaIso = to . join . from . fmap from
+  where
+    to :: Twist a -> Twist' a
+    to (T b x0 x1) = if b then T' b x1 x0 else T' b x0 x1
+
+    from :: Twist' a -> Twist a
+    from (T' b x0 x1) = if b then T b x1 x0 else T b x0 x1
 
 enumTwist' :: (Alternative f) => f a -> f (Twist' a)
 enumTwist' as = T' <$> (pure True <|> pure False) <*> as <*> as
+
+instance Applicative Twist' where
+  pure a = T' False a a
+  (<*>) = ap
+
+instance Monad Twist' where
+  ma >>= k = joinTwist' $ fmap k ma
 
 --------------------------------
 
@@ -236,7 +243,7 @@ enumOdd as = as1 <|> as3
 
 newtype List3Np1 a = List3Np1 [a]
   deriving stock (Show, Read, Eq, Ord, Functor, Foldable, Traversable)
-  -- Monad instance inherited from [] keeps invariant.
+  -- Monad instance inherited from [] preserves the invariant.
   deriving (Applicative, Monad) via []
 
 unfoldrList3Np1 :: (s -> Either a (a, a, a, s)) -> s -> List3Np1 a
@@ -255,3 +262,10 @@ toList3Np1 as
 
 makeInftyList3Np1 :: (s -> (a, s)) -> s -> List3Np1 a
 makeInftyList3Np1 f s = List3Np1 (unfoldr (Just . f) s)
+
+-- [x] or [x,y,z,w]
+enumList3Np1 :: Alternative f => f a -> f (List3Np1 a)
+enumList3Np1 as = List3Np1 <$> (one <$> as <|> four <$> as <*> as <*> as <*> as)
+  where
+    one a = [a]
+    four a0 a1 a2 a3 = [a0, a1, a2, a3] 
