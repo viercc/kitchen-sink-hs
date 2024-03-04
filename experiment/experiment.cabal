@@ -50,7 +50,9 @@ library
                      , containers
                      , data-ordlist
                      , vector
+                     , array
                      , data-memocombinators
+                     , equivalence
 
                      , integer-logarithms
 

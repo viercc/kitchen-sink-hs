@@ -1,6 +1,6 @@
 module Math.CountCoSemigroup where
 
-import Math.Combinatorics (partitions, uniquePointedContigencyTables)
+import Math.Combinatorics (partitions, uniquePointedContingencyTables)
 import Data.List (group)
 import qualified Data.MemoCombinators as Memo
 
@@ -22,7 +22,7 @@ parts m = [(k, m - k) | k <- [0 .. m]]
 twoPartialFunctionsCount :: Int -> Int -> Int -> Int
 twoPartialFunctionsCount = Memo.memo3 Memo.integral Memo.integral Memo.integral go
   where
-    go a b c = length $ uniquePointedContigencyTables b c a
+    go a b c = length $ uniquePointedContingencyTables b c a
 
 -- split of n is ordered triple (c,l,r) such that
 --  c + l + r + 1 == n
