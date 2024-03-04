@@ -51,10 +51,10 @@ partitions n0 = go n0 n0
           [i : rest | rest <- go i (n - i)]
             ++ go (i - 1) n
 
--- | Enumerate partitions of @n@ of to @k@ natural numbers.
+-- | Enumerate partitions of @n@ by @k@ natural numbers.
 --
--- * Unique up to reordering. e.g. [1,2,0] and [2,1,0] are considered equal
--- * A returned partition is represented as a list of positive integers in descending order
+-- * Unique up to reordering. e.g. [1,2,3] and [2,1,3] are considered equal
+-- * A returned partition is represented as a list of nonnegative integers in descending order
 partitionsK :: Int -> Int -> [[Int]]
 partitionsK n0 k0 = go k0 n0 n0
   where
