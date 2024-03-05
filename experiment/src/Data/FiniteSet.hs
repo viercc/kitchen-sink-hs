@@ -2,7 +2,6 @@ module Data.FiniteSet where
 
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.Ordered as OL
-import Data.Ord (Down (..), comparing)
 import Numeric.Natural (Natural)
 import Prelude hiding (succ)
 

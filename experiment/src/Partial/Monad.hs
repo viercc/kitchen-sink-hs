@@ -35,11 +35,10 @@ class PFunctor m => PMonad m where
   pjoin :: m (m a) -? m a
 
 instance PMonad m => Applicative (Pt m) where
-  pure = return
+  pure = Pt . runPartial ppure
   (<*>) = ap
 
 instance PMonad m => Monad (Pt m) where
-  return = Pt . runPartial ppure
   (>>=) = bind_
     where
       bind_ pma k = join_ $ fmap k pma

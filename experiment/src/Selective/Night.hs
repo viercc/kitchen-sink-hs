@@ -16,7 +16,6 @@ module Selective.Night where
 
 import Prelude hiding ((.), id)
 import Control.Category
-import Control.Applicative(Applicative(..))
 
 data a -? b = Const b | Fun (a -> b)
   deriving Functor
