@@ -1,8 +1,15 @@
-module Math.CountCoSemigroup where
+module Math.CountCoSemigroup
+  ( partitionsCount,
+    twoPartialFunctionsCount,
+    weaktransCosemigroupsCount,
+    cosemigroupsCount
+  )
+where
 
-import Math.Combinatorics (partitions, uniquePointedContingencyTables)
 import Data.List (group)
 import qualified Data.MemoCombinators as Memo
+import Math.Combinatorics (partitions)
+import Math.ContingencyTable (uniquePointedContingencyTables)
 
 -- | @partitionsCount n k@ = number of unique partitions of n into k positive integers
 --
@@ -36,9 +43,9 @@ splits n
       (l, r) <- parts lr
       pure (c, l, r)
 
--- count # of Splits
-splitCount :: Int -> Int
-splitCount = Memo.integral splitCount'
+-- count # of "weakly transitive" Cosemigroups
+weaktransCosemigroupsCount :: Int -> Int
+weaktransCosemigroupsCount = Memo.integral splitCount'
   where
     splitCount' n = sum [twoPartialFunctionsCount c l r | (c, l, r) <- splits n]
 
@@ -48,7 +55,7 @@ cosemigroupsCount n = sum [countForPartition as | as <- partitions n]
   where
     countForPartition = product . map countByGroup . group
     countByGroup [] = error "group is alway nonempty"
-    countByGroup (a : rest) = combinations (splitCount a + k - 1) k
+    countByGroup (a : rest) = combinations (weaktransCosemigroupsCount a + k - 1) k
       where
         k = 1 + length rest
 

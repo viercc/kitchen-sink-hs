@@ -14,9 +14,11 @@ library
   exposed-modules: AdHocInstances, AmbiguousExistential,
                    Newtypes, Cardinality, CheapRecord, CoerceUnder,
                    LCS,
+                   EquivalenceUtil,
                    
                    Math.AdditionChain,
                    Math.Combinatorics,
+                   Math.ContingencyTable,
                    Math.CountCoSemigroup,
                    Math.Ordinal,
                    Math.KrohnRhodes,
@@ -50,6 +52,7 @@ library
                      
                      , containers
                      , data-ordlist
+                     , hashable
                      , vector
                      , array
                      , data-memocombinators

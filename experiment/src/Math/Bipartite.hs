@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Math.Bipartite where
 
 import Data.List (foldl')
@@ -7,12 +8,16 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import Math.Combinatorics (partitions)
-import Data.Equivalence.Monad
-import Data.Foldable (for_)
 import Control.Monad (guard)
 
+import EquivalenceUtil
+import Data.Hashable
+import GHC.Generics (Generic)
+
 data Edge = E !Int !Int
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Generic)
+
+instance Hashable Edge
 
 type Graph = Set.Set Edge
 
@@ -45,7 +50,7 @@ transposeB i = Set.map f
       | otherwise  = E a b
 
 genUniqueBipartite :: [Int] -> [Int] -> [Graph]
-genUniqueBipartite ordA ordB = uniqueUpTo isos (genBipartite ordA ordB)
+genUniqueBipartite ordA ordB = uniqueUpToH isos (genBipartite ordA ordB)
   where
     isos = (transposeA <$> swapAs) ++
            (transposeB <$> swapBs)
@@ -82,11 +87,6 @@ chooseFrom' n m as
 
 deleteItem :: Ord k => Map.Map k Int -> k -> Map.Map k Int
 deleteItem bag k = Map.update (\n -> if n <= 1 then Nothing else Just (n - 1)) k bag
-
-uniqueUpTo :: Ord a => [a -> a] -> [a] -> [a]
-uniqueUpTo isoGenerators as = runEquivM id min do
-  for_ as $ \a -> equateAll (a : map ($ a) isoGenerators)
-  classes >>= traverse desc
 
 graphToDot :: Graph -> String
 graphToDot g = unlines $ ["digraph {"] ++ map indent contents ++ ["}"]
