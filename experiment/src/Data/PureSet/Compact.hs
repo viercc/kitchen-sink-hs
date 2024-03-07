@@ -1,48 +1,29 @@
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE InstanceSigs #-}
 
 -- | Hereditarily finite set
 module Data.PureSet.Compact
   ( Set (),
-    null,
-    size,
-    member,
-    empty,
-    singleton,
-    insert,
-    delete,
-    union,
-    bigUnion,
-    intersection,
-    difference,
-    symdiff,
-    toAscList,
-    toDescList,
-    fromList,
-    fromAscList,
-    fromDescList,
-    toNatural,
-    fromNatural,
-    showBrackets,
-    showBraces,
+    toAscList, toDescList,
+
+    toNatural, fromNatural,
+
     showAckermann,
-    pair,
-    matchPair,
-    cartesianProduct,
   )
 where
 
 import Data.Bits
 import Data.List (foldl', intersperse)
-import Data.Maybe (isNothing)
 import qualified Data.Set as D
 import qualified Data.Set.Extra as D
 import Data.Word (Word64)
-import qualified GHC.Exts as Ext
 import Math.NumberTheory.Logarithms (naturalLog2)
 import Numeric.Natural (Natural)
 import Prelude hiding (null)
+
+import Data.PureSet.Class
 
 type SmallNat = Word64
 
@@ -63,40 +44,62 @@ instance Ord Set where
     compare (D.toDescList xlarge) (D.toDescList ylarge) <> compare x y
 
 instance Show Set where
-  showsPrec _ = showsBrackets
+  showsPrec = defaultShowsPrec
+
+instance IsList Set where
+  type Item Set = Set
+
+  fromList = foldl' (flip insert) empty
+  toList = Data.PureSet.Compact.toAscList
 
 ----
 
-null :: Set -> Bool
-null (MkSet xlarge x) = x == 0 && D.null xlarge
+instance SetModel Set where
+  null :: Set -> Bool
+  null (MkSet xlarge x) = x == 0 && D.null xlarge
 
-size :: Set -> Int
-size (MkSet xlarge x) = D.size xlarge + popCount x
+  size :: Set -> Int
+  size (MkSet xlarge x) = D.size xlarge + popCount x
 
-member :: Set -> Set -> Bool
-member x (MkSet ylarge y) = case matchSmall x of
-  Nothing -> D.member x ylarge
-  Just x' -> testBit y x'
+  member :: Set -> Set -> Bool
+  member x (MkSet ylarge y) = case matchSmall x of
+    Nothing -> D.member x ylarge
+    Just x' -> testBit y x'
 
-empty :: Set
-empty = MkSet D.empty 0
+  empty :: Set
+  empty = MkSet D.empty 0
 
-singleton :: Set -> Set
-singleton x = case matchSmall x of
-  Nothing -> MkSet (D.singleton x) 0
-  Just x' -> MkSet D.empty (bit x')
+  singleton :: Set -> Set
+  singleton x = case matchSmall x of
+    Nothing -> MkSet (D.singleton x) 0
+    Just x' -> MkSet D.empty (bit x')
 
--- | insert x y = union (singleton x) y
-insert :: Set -> Set -> Set
-insert x (MkSet ylarge y) = case matchSmall x of
-  Nothing -> MkSet (D.insert x ylarge) y
-  Just x' -> MkSet ylarge (setBit y x')
+  union :: Set -> Set -> Set
+  union (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.union xlarge ylarge) (x .|. y)
 
--- | delete x y = difference y (singleton x)
-delete :: Set -> Set -> Set
-delete x (MkSet ylarge y) = case matchSmall x of
-  Nothing -> MkSet (D.delete x ylarge) y
-  Just x' -> MkSet ylarge (clearBit y x')
+  bigUnion :: Set -> Set
+  bigUnion (MkSet xlarge x) = D.foldl' union (MkSet D.empty (unionPositions64 x)) xlarge
+
+  intersection :: Set -> Set -> Set
+  intersection (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.intersection xlarge ylarge) (x .&. y)
+
+  difference :: Set -> Set -> Set
+  difference (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.difference xlarge ylarge) (x .&. complement y)
+
+  symdiff :: Set -> Set -> Set
+  symdiff (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.symdiff xlarge ylarge) (x `xor` y)
+
+  -- | insert x y = union (singleton x) y
+  insert :: Set -> Set -> Set
+  insert x (MkSet ylarge y) = case matchSmall x of
+    Nothing -> MkSet (D.insert x ylarge) y
+    Just x' -> MkSet ylarge (setBit y x')
+
+  -- | delete x y = difference y (singleton x)
+  delete :: Set -> Set -> Set
+  delete x (MkSet ylarge y) = case matchSmall x of
+    Nothing -> MkSet (D.delete x ylarge) y
+    Just x' -> MkSet ylarge (clearBit y x')
 
 -- | If a given set is "small", return its encoding.
 --   (the encoding /e/ of a small set is in 0 <= /e/ < 64)
@@ -105,54 +108,11 @@ matchSmall (MkSet xlarge x)
   | D.null xlarge && x < wordSize = toIntegralSized x
   | otherwise = Nothing
 
-union :: Set -> Set -> Set
-union (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.union xlarge ylarge) (x .|. y)
-
-bigUnion :: Set -> Set
-bigUnion (MkSet xlarge x) = D.foldl' union (MkSet D.empty (unionPositions64 x)) xlarge
-
-intersection :: Set -> Set -> Set
-intersection (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.intersection xlarge ylarge) (x .&. y)
-
-difference :: Set -> Set -> Set
-difference (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.difference xlarge ylarge) (x .&. complement y)
-
-symdiff :: Set -> Set -> Set
-symdiff (MkSet xlarge x) (MkSet ylarge y) = MkSet (D.symdiff xlarge ylarge) (x `xor` y)
-
 toAscList :: Set -> [Set]
 toAscList (MkSet xlarge x) = [MkSet D.empty (fromIntegral i) | i <- bitAscList x] ++ D.toAscList xlarge
 
 toDescList :: Set -> [Set]
 toDescList (MkSet xlarge x) = D.toDescList xlarge ++ [MkSet D.empty (fromIntegral i) | i <- bitDescList x]
-
-fromList :: [Set] -> Set
-fromList = foldl' (flip insert) empty
-
-fromAscList :: [Set] -> Set
-fromAscList xs = case spanJust matchSmall xs of
-  (smalls, larges) -> MkSet (D.fromAscList larges) (fromBitList smalls)
-
-spanJust :: (a -> Maybe b) -> [a] -> ([b], [a])
-spanJust f = go
-  where
-    go [] = ([], [])
-    go (a : as) = case f a of
-      Nothing -> ([], a : as)
-      Just b -> case go as of
-        ~(justs, nothings) -> (b : justs, nothings)
-
-fromDescList :: [Set] -> Set
-fromDescList xs = case span (isNothing . matchSmall) xs of
-  (larges, smalls) -> case traverse matchSmall smalls of
-    Just smalls' -> MkSet (D.fromDescList larges) (fromBitList smalls')
-    Nothing -> error "Not a descending list?"
-
-instance Ext.IsList Set where
-  type Item Set = Set
-
-  fromList = Data.PureSet.Compact.fromList
-  toList = Data.PureSet.Compact.toAscList
 
 -- | Bijection from 'Set' to 'Natural'.
 --
@@ -216,27 +176,9 @@ bitPatterns =
 
 bitAscList, bitDescList :: FiniteBits a => a -> [Int]
 bitAscList a = filter (testBit a) [0 .. finiteBitSize a - 1]
-bitDescList a = filter (testBit a) [n, n - 1 .. 0]
-  where
-    n = finiteBitSize a
-
-fromBitList :: Bits a => [Int] -> a
-fromBitList = foldl' (.|.) zeroBits . map bit
+bitDescList a = reverse $ bitAscList a
 
 -- Printing out
-
-showsBrackets :: Set -> ShowS
-showsBrackets = go
-  where
-    go xs = brackets $ commaList (go <$> toAscList xs)
-
-showBrackets :: Set -> String
-showBrackets = ($ "") . showsBrackets
-
-showBraces :: Set -> String
-showBraces = ($ "") . go
-  where
-    go xs = braces $ commaList (go <$> toAscList xs)
 
 -- Show using Ackermann's encoding
 showAckermann :: Set -> String
@@ -252,37 +194,3 @@ commaList ss = foldr (.) id (intersperse (", " ++) ss)
 
 braces :: ShowS -> ShowS
 braces ss = ('{' :) . ss . ('}' :)
-
-brackets :: ShowS -> ShowS
-brackets ss = ('[' :) . ss . (']' :)
-
---
-
--- | pair x y = {{x}, {x,y}}
-pair :: Set -> Set -> Set
-pair x y = fromList [sx, sx `union` sy]
-  where
-    sx = singleton x -- {x}
-    sy = singleton y -- {y}
-
--- | If a given set can be constructed by 'pair', return the original values of the pair.
-matchPair :: Set -> Maybe (Set, Set)
-matchPair z = case toAscList z of
-  -- If @x == y@, then @pair x y == singleton (singleton x)@
-  [sx] -> case toAscList sx of
-    [x] -> Just (x, x)
-    _ -> Nothing
-  -- It's always true that @x <= x `union` y@ for @x /= y@.
-  -- Therefore we can assume the smallest element is singleton and
-  -- the next element is doubleton.
-  [sx, sxy] -> case (toAscList sx, toAscList sxy) of
-    ([x], [t, u])
-      | x == t -> Just (x, u)
-      | x == u -> Just (x, t)
-    _ -> Nothing
-  _ -> Nothing
-
-cartesianProduct :: Set -> Set -> Set
-cartesianProduct xs ys
-  | size xs <= size ys = foldl' union empty [fromAscList [pair x y | y <- toAscList ys] | x <- toAscList xs]
-  | otherwise = foldl' union empty [fromAscList [pair x y | x <- toAscList xs] | y <- toAscList ys]

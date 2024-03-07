@@ -39,12 +39,15 @@ library
 
                    Selective.Prism, Selective.Night,
 
-                   Data.Set.Extra, Data.PureSet, Data.PureSet.Compact,
-                   Data.FiniteSet,
+                   Data.Set.Extra,
+                   Data.PureSet.Set,
+                   Data.PureSet.Class,
+                   Data.PureSet.Compact,
+                   Data.PureSet.Tree,
+                   
                    Data.Functor.Derivative,
 
                    TreesThatGrow,
-                   Isomorphisms, Isomorphisms2,
                    TheseChain,
   build-depends:       base >= 4.10 && < 5
                      , ghc-prim
