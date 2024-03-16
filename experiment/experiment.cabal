@@ -16,6 +16,8 @@ library
                    LCS,
                    EquivalenceUtil,
                    
+                   InternalCategory,
+
                    Math.AdditionChain,
                    Math.Combinatorics,
                    Math.ContingencyTable,
