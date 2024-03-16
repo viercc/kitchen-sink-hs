@@ -8,6 +8,7 @@ module Main where
 import Type.Reflection
 import Data.HMatchable
 import Universe
+import qualified Data.Dependent.Map as DMap
 
 main :: IO ()
 main = do
@@ -36,7 +37,7 @@ printPatternMatch val pat = do
   case hPatternMatch pat val of
     Nothing -> do putStrLn "  Fail"
     Just as -> do putStrLn "  Success"
-                  mapM_ (\a -> putStrLn ("    " ++ prettyAssignment a)) as
+                  mapM_ (\a -> putStrLn ("    " ++ prettyAssignment a)) (DMap.toList as)
 
 var :: Typeable a => String -> Pattern a
 var varName = varPat (varName :::: typeRep)

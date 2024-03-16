@@ -2,20 +2,21 @@
 {-# LANGUAGE PolyKinds      #-}
 {-# LANGUAGE RankNTypes     #-}
 {-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE TypeOperators #-}
 module Universe where
 
 import Data.Functor.Classes(showsUnaryWith, showsBinaryWith)
 
 import Type.Reflection
 import Data.GADT.Show ( GShow(..) )
-import Data.GADT.Compare (GEq(..))
+import Data.GADT.Compare (GEq(..), GCompare (..), GOrdering (..))
 
 import Data.HFunctor (HFunctor(..))
 import Data.HFunctor.HTraversable (HTraversable(..))
+import Data.Functor.Combinator (HFree(..))
+
 import Data.HFix
-import Data.HFree
 import Data.HMatchable
+import Data.Dependent.Sum
 
 {-
 data Value a where
@@ -85,6 +86,13 @@ instance GEq Var where
       Just Refl | x == y    -> Just Refl
                 | otherwise -> Nothing
 
+instance GCompare Var where
+  gcompare (x :::: tx) (y :::: ty) =
+    case compare x y of
+      LT -> GLT
+      EQ -> gcompare tx ty
+      GT -> GGT
+
 -- * Values
 type Value = HFix Shape
 
@@ -108,22 +116,22 @@ pair a b = HFix (PairF a b)
 type Pattern = HFree Shape Var
 
 varPat :: Var a -> Pattern a
-varPat = HPure
+varPat = HReturn
 
 litPat :: Int -> Pattern Int
-litPat = HFree . LitF
+litPat = HJoin . LitF
 
 nilPat :: Pattern [a]
-nilPat = HFree NilF
+nilPat = HJoin NilF
 
 consPat :: Pattern a -> Pattern [a] -> Pattern [a]
-consPat a as = HFree (ConsF a as)
+consPat a as = HJoin (ConsF a as)
 
 listPat :: [Pattern a] -> Pattern [a]
 listPat = foldr consPat nilPat
 
 pairPat :: Pattern a -> Pattern b -> Pattern (a,b)
-pairPat a b = HFree (PairF a b)
+pairPat a b = HJoin (PairF a b)
 
 
 ---- pretty-printing
@@ -132,7 +140,7 @@ type PP f = forall a. Int -> f a -> ShowS
 
 prettyShapePrec :: PP f -> PP (Shape f)
 prettyShapePrec prettyF p shape = case shape of
-  LitF a -> showsPrec 0 a
+  LitF a -> showsPrec p a
   NilF -> ("nil" ++)
   ConsF fa fas -> showParen (p > 5) (prettyF 6 fa . (" : " ++) . prettyF 5 fas) 
   PairF fa fb -> showParen True $ prettyF 0 fa . (", " ++) . prettyF 0 fb
@@ -142,8 +150,8 @@ prettyFixPrec prettyT p (HFix t) = prettyT (prettyFixPrec prettyT) p t
 
 prettyFreePrec :: PP v -> (forall f. PP f -> PP (t f)) -> PP (HFree t v)
 prettyFreePrec prettyV prettyT p ftv = case ftv of
-    HPure va -> prettyV p va
-    HFree t -> prettyT (prettyFreePrec prettyV prettyT) p t
+    HReturn va -> prettyV p va
+    HJoin t -> prettyT (prettyFreePrec prettyV prettyT) p t
 
 prettyVarPrec :: PP Var
 prettyVarPrec _ (varName :::: _) = (varName ++)
@@ -154,5 +162,5 @@ prettyVal val = prettyFixPrec prettyShapePrec 0 val ""
 prettyPat :: Pattern a -> String
 prettyPat pat = prettyFreePrec prettyVarPrec prettyShapePrec 0 pat ""
 
-prettyAssignment :: Assignment Var Value -> String
-prettyAssignment ((x :::: ty) :== val) = x ++ " :== " ++ prettyVal val ++ "\t:: " ++ show ty
+prettyAssignment :: DSum Var Value -> String
+prettyAssignment ((x :::: ty) :=> val) = x ++ " :=> " ++ prettyVal val ++ "\t:: " ++ show ty

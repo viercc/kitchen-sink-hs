@@ -19,11 +19,12 @@ library
     import:           warnings
     exposed-modules:
         Data.HMatchable,
-        Data.HFix,
-        Data.HFree
+        Data.HFix
     build-depends:
         base >=4.14 && <4.20,
         some,
+        dependent-sum,
+        dependent-map,
         functor-combinators,
         matchable
     hs-source-dirs:   src
@@ -38,6 +39,8 @@ executable try-typed-patterns
         base ^>=4.18.1.0,
         functor-combinators,
         hmatchable,
+        dependent-sum,
+        dependent-map,
         some
 
     hs-source-dirs:   app
