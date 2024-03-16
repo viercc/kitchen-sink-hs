@@ -11,78 +11,82 @@ extra-source-files:  README.md
 
 library
   hs-source-dirs:  src
-  exposed-modules: AdHocInstances, AmbiguousExistential,
-                   Newtypes, Cardinality, CheapRecord, CoerceUnder,
-                   LCS,
-                   EquivalenceUtil,
-                   
-                   InternalCategory,
+  exposed-modules:
+    AdHocInstances, AmbiguousExistential,
+    Newtypes, Cardinality, CheapRecord, CoerceUnder,
+    LCS,
+    EquivalenceUtil,
+    
+    InternalCategory,
 
-                   Math.AdditionChain,
-                   Math.Combinatorics,
-                   Math.ContingencyTable,
-                   Math.CountCoSemigroup,
-                   Math.Ordinal,
-                   Math.KrohnRhodes,
-                   Math.Bipartite,
+    Math.AdditionChain,
+    Math.Combinatorics,
+    Math.ContingencyTable,
+    Math.CountCoSemigroup,
+    Math.Ordinal,
+    Math.KrohnRhodes,
+    Math.Bipartite,
 
-                   Co,
+    Co,
 
-                   Applicative.Heyting,
-                   Applicative.Hoard,
-                   Applicative.MergedHead,
-                   Applicative.LmfContainer,
+    Applicative.Heyting,
+    Applicative.Hoard,
+    Applicative.MergedHead,
+    Applicative.LmfContainer,
 
-                   Rank2.Unzip,
-                   
-                   Partial.Monad,
-                   Partial.Monoidal,
-                   Partial.Poifree,
+    Rank2.Unzip,
+    
+    Partial.Monad,
+    Partial.Monoidal,
+    Partial.Poifree,
 
-                   Selective.Prism, Selective.Night,
+    Selective.Prism, Selective.Night,
 
-                   Data.Set.Extra,
-                   Data.PureSet.Set,
-                   Data.PureSet.Class,
-                   Data.PureSet.Compact,
-                   Data.PureSet.Tree,
-                   
-                   Data.Functor.Derivative,
+    Data.Set.Extra,
+    Data.PureSet.Set,
+    Data.PureSet.Class,
+    Data.PureSet.Compact,
+    Data.PureSet.Tree,
+    
+    Data.Functor.Derivative,
 
-                   TreesThatGrow,
-                   TheseChain,
-  build-depends:       base >= 4.10 && < 5
-                     , ghc-prim
-                     , reflection
-                     
-                     , containers
-                     , data-ordlist
-                     , hashable
-                     , vector
-                     , array
-                     , data-memocombinators
-                     , equivalence
+    TreesThatGrow,
+    TheseChain,
+  build-depends:
+      base >= 4.10 && < 5
+    , ghc-prim
+    , reflection
+    
+    , containers
+    , data-ordlist
+    , hashable
+    , vector
+    , array
+    , data-memocombinators
+    , equivalence
 
-                     , integer-logarithms
+    , integer-logarithms
 
-                     , finitary
-                     , finite-typelits
+    , finitary
+    , finite-typelits
 
-                     , lens
-                     , selective
-                     , semialign
-                     , rank2classes
-                     , these
-                     
-                     , transformers
-                     , mtl
+    , lens
+    , selective
+    , semialign
+    , rank2classes
+    , these
+    
+    , transformers
+    , mtl
 --                   , free
-                     , profunctors
-                     , comonad
-                     , kan-extensions
-                     , some
-                     
-                     , lattices
-  ghc-options:       -Wall -Wcompat
-                     -Wunused-packages -Wwarn=unused-packages
-  default-language:  Haskell2010
+    , profunctors
+    , comonad
+    , kan-extensions
+    , some
+    
+    , lattices
+  ghc-options:
+    -Wall -Wcompat
+    -Wunused-packages -Wwarn=unused-packages
+  default-language:
+    Haskell2010
