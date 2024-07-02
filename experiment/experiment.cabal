@@ -27,6 +27,8 @@ library
     Math.KrohnRhodes,
     Math.Bipartite,
 
+    Hopf,
+
     Co,
 
     Applicative.Heyting,
@@ -69,6 +71,7 @@ library
 
     , finitary
     , finite-typelits
+    , groups
 
     , lens
     , selective
@@ -81,6 +84,7 @@ library
 --                   , free
     , profunctors
     , comonad
+    , day-comonoid
     , kan-extensions
     , some
     
