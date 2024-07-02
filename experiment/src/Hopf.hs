@@ -46,15 +46,51 @@ instance Applicative V3 where
 
 instance Comonad V3 where
   extract (V3 x0 _ _) = x0
-  duplicate (V3 x0 x1 x2) = V3 (V3 x0 x1 x2) (V3 x1 x2 x0) (V3 x2 x0 x1)
+  duplicate = duplicateDefault
 
 instance Comonoid V3 where
-  coapply (V3 x0 x1 x2) = Day (V3 0 1 2) (V3 0 1 2) $ \i j ->
+  coapply (V3 x0 x1 x2) = Day ix ix $ \i j ->
     case (i + j) `mod` 3 of
       0 -> x0
       1 -> x1
       _ -> x2
+    where
+      ix = V3 0 1 2 :: V3 Integer
 
 instance Hopf V3 where
   antipode (V3 x0 x1 x2) = V3 x0 x2 x1
 
+data Twist a = Twist Bool (V3 a)
+  deriving (Eq, Show, Functor)
+
+instance Applicative Twist where
+  pure x = Twist False (pure x)
+  Twist a xs <*> Twist b ys = Twist (a `xor` b) (xs <*> act a ys)
+    where
+      act :: Bool -> V3 a -> V3 a
+      act c = if c then antipode else id
+
+xor :: Bool -> Bool -> Bool
+xor = (/=)
+
+{-
+ghci> u = Twist False (V3 "a" "b" "c")
+ghci> v = Twist True (V3 "A" "B" "C")
+ghci> (<++>) = liftA2 (++)
+ghci> do { x <- [u,v]; y <- [u,v]; z <- [u,v]; guard (x <++> (y <++> z) /= (x <++> y) <++> z); pure (x,y,z) }
+-}
+
+instance Comonad Twist where
+  extract (Twist _ xs) = extract xs
+  duplicate = duplicateDefault
+
+instance Comonoid Twist where
+  coapply (Twist b xs) = case coapply xs of
+    Day ixes ixes' op -> Day (Twist b ixes) (Twist b ixes') op
+
+instance Hopf Twist where
+  antipode (Twist b xs) = Twist b (antiact b xs)
+    where
+      -- antiact = antipode . act
+      antiact :: Bool -> V3 a -> V3 a
+      antiact c = if c then id else antipode
