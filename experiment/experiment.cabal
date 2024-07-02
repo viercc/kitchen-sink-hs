@@ -44,6 +44,8 @@ library
 
     Selective.Prism, Selective.Night,
 
+    NonDistributive,
+
     Data.Set.Extra,
     Data.PureSet.Set,
     Data.PureSet.Class,
