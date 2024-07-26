@@ -53,6 +53,7 @@ library
     Data.PureSet.Tree,
     
     Data.Functor.Derivative,
+    Data.Functor.Curried,
 
     TreesThatGrow,
     TheseChain,
