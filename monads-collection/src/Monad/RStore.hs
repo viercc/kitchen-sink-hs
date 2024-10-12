@@ -52,8 +52,8 @@ toRStore qx = R $ \k ->
 
 -- | @SC s@ is isomorphic to @Q s@.
 --
---   It /looks/ like it is the product monad of 'Control.Monad.Select.Select' and
---   'Control.Monad.Cont.Cont' ...
+--   It /looks/ like it is the product monad of 'Control.Monad.Trans.Select.Select' and
+--   'Control.Monad.Trans.Cont.Cont' ...
 --   but it isn't! The two components are not independent.
 data SC s a = SC {
     runSelect :: (a -> s) -> a,
@@ -62,11 +62,13 @@ data SC s a = SC {
   deriving Functor
 
 instance Applicative (SC s) where
-  pure x = SC { runSelect = const x, runCont = ($ x) }
+  pure = pureSC
   (<*>) = ap
-
 instance Monad (SC s) where
   ma >>= k = joinSC (fmap k ma)
+
+pureSC :: a -> SC s a
+pureSC x = SC { runSelect = const x, runCont = ($ x) }
 
 joinSC :: SC s (SC s a) -> SC s a
 joinSC mmx = SC { runSelect = selPart, runCont = contPart }
