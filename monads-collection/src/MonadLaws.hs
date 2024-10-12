@@ -3,7 +3,7 @@
 
 module MonadLaws
   ( Enum1,
-    skolem1, skolem2, skolem3,
+    Var, skolem1, skolem2, skolem3,
     propMonadUnitL,
     propMonadUnitR,
     propMonadAssoc,

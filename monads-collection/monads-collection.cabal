@@ -14,6 +14,7 @@ library
                      Monad.FreeAny,
                      Monad.Indexed,
                      Monad.Logger,
+                     Monad.RStore,
                      Monad.Transducer.Freer,
                      Monad.Transducer.Free,
                      Monad.Searchable,
@@ -41,6 +42,15 @@ test-suite esoteric-test
                , monads-collection
   default-language: Haskell2010
   ghc-options:      -rtsopts -with-rtsopts=-M64m
+
+test-suite r-store-test
+  type:    exitcode-stdio-1.0
+  main-is: RStoreTest.hs
+  hs-source-dirs: test
+  build-depends: base >=4.11 && <5
+               , monads-collection
+  default-language: Haskell2010
+  ghc-options:      -rtsopts -with-rtsopts=-M512m
 
 test-suite efreet-test
   type:    exitcode-stdio-1.0
