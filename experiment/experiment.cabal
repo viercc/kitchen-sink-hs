@@ -29,6 +29,7 @@ library
 
     Hopf,
 
+    Comonad.SingleLayer,
     Co,
 
     Applicative.Heyting,
