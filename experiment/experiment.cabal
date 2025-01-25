@@ -30,7 +30,9 @@ library
     Hopf,
 
     Comonad.SingleLayer,
+    Comonad.Dist,
     Co,
+    FakeProof,
 
     Applicative.Heyting,
     Applicative.Hoard,
