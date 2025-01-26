@@ -47,8 +47,6 @@ library
 
     Selective.Prism, Selective.Night,
 
-    NonDistributive,
-
     Data.Set.Extra,
     Data.PureSet.Set,
     Data.PureSet.Class,
@@ -77,6 +75,7 @@ library
 
     , finitary
     , finite-typelits
+    , ghc-typelits-knownnat
     , groups
 
     , lens
