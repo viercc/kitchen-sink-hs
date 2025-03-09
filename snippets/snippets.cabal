@@ -7,7 +7,13 @@ author:              Koji Miyazato
 copyright:           2021-2022 Koji Miyazato
 build-type:          Simple
 
+common common-configs
+  ghc-options:       -Wall -Wcompat
+                     -Wunused-packages -Wwarn=unused-packages
+  default-language:  Haskell2010
+
 library
+  import: common-configs
   hs-source-dirs:  src
   exposed-modules: 
     QualPolyKind.A, QualPolyKind.B,
@@ -19,14 +25,25 @@ library
     NumExpr,
     ContEq2,
     Impredic
-  build-depends:       base >= 4.10 && < 5
-                     , containers
-                     , data-ordlist
-                     , vector
-                     , transformers
-                     , mtl
-                     , free
-                     , data-memocombinators
-  ghc-options:       -Wall -Wcompat
-                     -Wunused-packages -Wwarn=unused-packages
-  default-language:  Haskell2010
+  build-depends:
+      base >= 4.10 && < 5
+    , containers
+    , data-ordlist
+    , text
+    , vector
+    , transformers
+    , mtl
+    , free
+    , data-memocombinators
+
+executable weakchan
+  import: common-configs
+  hs-source-dirs: exec/weakchan
+  main-is: Main.hs
+  other-modules: Chan
+  build-depends:
+    base >= 4.10 && < 5
+    , text
+    , mtl
+    , async
+  ghc-options: -threaded
