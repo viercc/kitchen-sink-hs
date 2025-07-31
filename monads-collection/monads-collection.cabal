@@ -24,6 +24,7 @@ library
                      Monad.Builder,
                      Monad.Efreet,
                      Monad.Trie,
+                     Monad.ExoticCont,
                      MonadLaws
   build-depends:     base >=4.11 && <5
                    , containers

@@ -2,11 +2,15 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module Monad.RStore where
 
 import Data.Bifunctor (first)
 
-import Control.Monad
+import Control.Monad ( ap )
 import Control.Comonad
 import Control.Comonad.Store
 
@@ -53,7 +57,7 @@ wrap' :: (r, s) -> (s -> (r, s), s)
 wrap' = runStore . wrap
 -- wrap' = first (,)
 
-{- * Proof of the isomorphism-ness of (g2r, r2g) pair
+{- Proof: @'g2r', 'r2g'@ are inverses each other
 
 r2g (g2r g)
  = G $ \cont -> runR (g2r g) (wrap . cont)
@@ -97,9 +101,9 @@ joinG, joinG' :: G s (G s a) -> G s a
 joinG ggx = G $ \cont -> runG ggx $ \gx -> runG gx cont
 joinG' = r2g . joinR . fmap g2r . g2r
 
-{- * The isomorphism r2g is a monad morphism
+{- The isomorphism r2g is a monad morphism
 
-  (therefore the two are isomorphic /as monads/)
+(therefore the two are isomorphic /as monads/)
 
   [pureG = pureG']
 
@@ -311,8 +315,15 @@ newtype C s a = C { runC :: (a -> s) -> s }
 pureC :: a -> C s a
 pureC x = C ($ x)
 
-joinC :: C s (C s a) -> C s a
-joinC mmx = C $ \f -> runC mmx (\mx -> runC mx f)
+bindC :: C s a -> (a -> C s b) -> C s b
+bindC ma k = C $ \f -> runC ma (\a -> runC (k a) f)
+
+instance Applicative (C s) where
+  pure = pureC
+  (<*>) = ap
+
+instance Monad (C s) where
+  (>>=) = bindC
 
 -- | Selection monad
 newtype S s a = S { runS :: (a -> s) -> a }
@@ -323,3 +334,15 @@ pureS x = S $ const x
 
 joinS :: S s (S s a) -> S s a
 joinS mmx = S $ \f -> runS (runS mmx (\mx -> f (runS mx f))) f
+
+bindS :: S s a -> (a -> S s b) -> S s b
+bindS ma k = S $ \f -> 
+  let g = \a -> f (runS (k a) f)
+  in runS (k (runS ma g)) f
+
+instance Applicative (S s) where
+  pure = pureS
+  (<*>) = ap
+
+instance Monad (S s) where
+  (>>=) = bindS
