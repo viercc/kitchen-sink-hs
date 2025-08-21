@@ -26,6 +26,8 @@ library
     Math.Ordinal,
     Math.KrohnRhodes,
     Math.Bipartite,
+    Math.QSqrt2,
+    Math.DyckWord,
 
     Hopf,
 
