@@ -48,6 +48,9 @@ library
 
     Selective.Prism, Selective.Night,
 
+    Data.Relation,
+    Data.Relation.Labelled,
+    
     Data.Set.Extra,
     Data.PureSet.Set,
     Data.PureSet.Class,
@@ -56,6 +59,10 @@ library
     
     Data.Functor.Derivative,
     Data.Functor.Curried,
+
+    Lang.RegularExpression,
+    Lang.NFA,
+    Lang.DFA,
 
     TreesThatGrow,
     TheseChain,
