@@ -7,6 +7,7 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE TypeOperators #-}
 {-
 
 https://x.com/ymdfield/status/1961962801574084680
@@ -15,8 +16,11 @@ https://x.com/ymdfield/status/1961962801574084680
 module IxEither where
 
 import Data.Kind (Type)
+import Data.Type.Equality
 import Data.Coerce
 import Data.Type.Coercion
+
+import RoleAnnot (Foo_N, Bar_R())
 
 ----------------------------------
 -- Using GADT
@@ -67,3 +71,16 @@ coercionOnFalseF = Coercion
 data SBool (i :: Bool) where
   SFalse :: SBool False
   STrue :: SBool True
+
+----
+
+decompRepFoo :: Coercible (Foo_N x) (Foo_N y) => x :~: y
+decompRepFoo = Refl
+
+can'tDecompNewtype :: Coercible (Bar_R x) (Bar_R y) => Coercion x y
+-- can'tDecompNewtype = Coercion
+can'tDecompNewtype = undefined
+
+newtype Baz a = MkBaz a
+visibleNewtype :: Coercible (Baz x) (Baz y) => Coercion x y
+visibleNewtype = Coercion

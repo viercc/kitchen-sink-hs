@@ -25,7 +25,8 @@ library
     NumExpr,
     ContEq2,
     Impredic,
-    IxEither
+    IxEither,
+    RoleAnnot
   build-depends:
       base >= 4.10 && < 5
     , containers
