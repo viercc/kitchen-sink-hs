@@ -24,7 +24,8 @@ library
     OrM,
     NumExpr,
     ContEq2,
-    Impredic
+    Impredic,
+    IxEither
   build-depends:
       base >= 4.10 && < 5
     , containers
