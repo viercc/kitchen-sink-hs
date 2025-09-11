@@ -26,7 +26,8 @@ library
     ContEq2,
     Impredic,
     IxEither,
-    RoleAnnot
+    RoleAnnot,
+    ExcludedMiddle
   build-depends:
       base >= 4.10 && < 5
     , containers
