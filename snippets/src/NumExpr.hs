@@ -11,5 +11,7 @@ instance Num Expr where
     fromInteger = Literal
     a + b = Fun "+" [a,b]
     a - b = Fun "-" [a,b]
-    -- etc.
     negate a = Fun "negate" [a]
+    a * b = Fun "*" [a,b]
+    abs a = Fun "abs" [a]
+    signum a = Fun "signum" [a]

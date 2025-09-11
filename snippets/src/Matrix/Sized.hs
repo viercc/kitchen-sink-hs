@@ -19,7 +19,6 @@ module Matrix.Sized(
 import           Prelude             hiding (fromInteger, negate)
 import qualified Prelude             as P
 
-import           Control.Applicative
 import           Data.Ratio
 
 import           Data.List           (foldl', transpose)

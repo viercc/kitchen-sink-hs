@@ -21,13 +21,13 @@ fooA :: forall (a :: Type). (forall m. m a -> m a) -> ()
 --
 -- and this doesn't typecheck.
 fooA f =
-  let xx :: A a
-      xx = MkA f
+  let _xx :: A a
+      _xx = MkA f
    in ()
 
 -- fooB :: forall k (a :: k). (forall (m :: k -> *). m a -> m a) -> ()
 fooB :: forall a. (forall m. m a -> m a) -> ()
 fooB f =
-  let xx :: B a
-      xx = MkB f
+  let _xx :: B a
+      _xx = MkB f
    in ()

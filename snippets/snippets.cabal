@@ -27,7 +27,10 @@ library
     Impredic,
     IxEither,
     RoleAnnot,
-    ExcludedMiddle
+    ExcludedMiddle,
+    InfiniteList,
+    Matrix.Sized,
+    Matrix.Fold
   build-depends:
       base >= 4.10 && < 5
     , containers

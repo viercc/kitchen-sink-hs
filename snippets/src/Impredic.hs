@@ -10,7 +10,7 @@ f :: ((Show a) => a -> b) -> a -> b
 f = undefined
 
 (&) :: a -> (a -> b) -> b
-x & f = f x
+(&) = flip id
 
 def1, def2, def3 :: a -> String
 def1 = f x
