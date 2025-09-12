@@ -80,7 +80,7 @@ cmpContNat x y = case pcmp x y of
 
 -- test
 
-ex1, ex2, ex3, ex4, ex5 :: Cont Bool Natural
+ex1, ex2, ex3, ex4, ex5, ex6 :: Cont Bool Natural
 ex1 = Cont $ \k -> (k 0 || k 2) && (k 1 || k 2)
 ex2 = Cont $ \k -> (k 0 && k 1) || k 2
 ex3 = Cont $ \k -> (k 0 && not (k 1)) || k 2
