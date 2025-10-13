@@ -1,9 +1,14 @@
 {-# LANGUAGE NumericUnderscores, BangPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
 module Main where
 
 import Control.Concurrent
 import Control.Parallel.Strategies
 import System.IO.Unsafe
+
+import Data.Time.Clock (DiffTime, diffTimeToPicoseconds)
+import Data.Time.Clock.System
+import Data.Time.Clock.TAI (diffAbsoluteTime)
 
 -- Checks Fermat's little theorem holds.
 -- It should return 1 always.
@@ -63,21 +68,18 @@ runChunked' sig strat f = loop 0
 
 main :: IO ()
 main = do
-  -- Create a MVar which is filled 3 seconds later
-  sig <- newEmptyMVar
-  _ <- forkIO $ threadDelay 3_000_000 >> putMVar sig ()
   
   let -- Returns 0 when aborting.
       -- Note that task always returns 1.
-      task' = unsafeCheckAbort sig 0 task
+      task' sig = unsafeCheckAbort sig 0 task
       xs = [1..1_000_000]
-  -- runSeq task xs
-  -- runSeq' sig task xs
-  -- runSeq task' xs
-  -- runParMap task' xs
-  -- runParMapBuf task' xs
-  -- runChunked' sig (parList rseq) task xs
-  runChunked' sig (parBuffer bufSize rseq) task xs
+  measureReportTime "runSeq task (control)" $ \_ -> runSeq task xs
+  measureReportTime "runSeq' task" $ \sig -> runSeq' sig task xs
+  measureReportTime "runSeq task'" $ \sig -> runSeq (task' sig) xs
+  measureReportTime "runParMap task'" $ \sig -> runParMap (task' sig) xs
+  measureReportTime "runParMapBuf task'" $ \sig -> runParMapBuf (task' sig) xs
+  measureReportTime "runChunked'-parList" $ \sig -> runChunked' sig (parList rseq) task xs
+  measureReportTime "runChunked'-parBuffer" $ \sig -> runChunked' sig (parBuffer bufSize rseq) task xs
 
 -- This is EVIL utility function!
 --
@@ -92,3 +94,20 @@ unsafeCheckAbort sig def f a = unsafePerformIO $
      if alive
        then return (f a)
        else return def
+
+measureReportTime :: String -> (MVar () -> IO ()) -> IO ()
+measureReportTime labelStr body = do
+  putStrLn $ "[" ++ labelStr ++ "]"
+  -- Create a MVar which is filled 3 seconds later
+  sig <- newEmptyMVar
+  aborter <- forkIO $ threadDelay 3_000_000 >> putMVar sig ()
+  t0 <- getSystemTime
+  body sig
+  t1 <- getSystemTime
+  let dt_ps = diffTimeToPicoseconds (diffSystemTime t1 t0)
+      dt_s = fromInteger dt_ps * 10 ^^ (-12 :: Int) :: Double
+  putStrLn $ "time = " ++ show dt_s
+  killThread aborter
+
+diffSystemTime :: SystemTime -> SystemTime -> DiffTime
+diffSystemTime t1 t0 = diffAbsoluteTime (systemToTAITime t1) (systemToTAITime t0)
