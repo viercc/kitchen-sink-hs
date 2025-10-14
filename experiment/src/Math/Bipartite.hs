@@ -2,17 +2,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Math.Bipartite where
 
-import Data.List (foldl')
-
-import qualified Data.Map.Strict as Map
+import qualified Data.MultiSet as Bag
 import qualified Data.Set as Set
 
-import Math.Combinatorics (partitions)
+import Math.Combinatorics (partitions, Bag)
 import Control.Monad (guard)
 
-import EquivalenceUtil
-import Data.Hashable
+import EquivalenceUtil ( uniqueUpToH )
+import Data.Hashable ( Hashable )
 import GHC.Generics (Generic)
+import qualified Data.Foldable as F
 
 data Edge = E !Int !Int
     deriving (Show, Eq, Ord, Generic)
@@ -26,11 +25,11 @@ genBipartite ordA ordB
   | sum ordA /= sum ordB = error "Total number of edges differ!"
   | otherwise = map mkGraph $ go (zip [0..] ordA) initialCapacity
   where
-    initialCapacity = Map.fromList [ (v,w) | (v,w) <- zip [0..] ordB, w > 0 ]
+    initialCapacity = Bag.fromOccurList [ (v,w) | (v,w) <- zip [0..] ordB, w > 0 ]
     go [] _ = [[]]
     go ((a,na) : as) capacity = do
-      bs <- chooseFrom na (Map.keys capacity)
-      let capacity' = foldl' deleteItem capacity bs
+      bs <- chooseFrom na (Bag.toSet capacity)
+      let capacity' = capacity Bag.\\ Bag.fromList bs
       rest <- go as capacity'
       pure $ (E a <$> bs) ++ rest
     mkGraph = Set.fromList
@@ -54,8 +53,12 @@ genUniqueBipartite ordA ordB = uniqueUpToH isos (genBipartite ordA ordB)
   where
     isos = (transposeA <$> swapAs) ++
            (transposeB <$> swapBs)
-    swapAs = [ i | (i, n, n') <- zip3 [0..] ordA (tail ordA), n == n' ]
-    swapBs = [ i | (i, n, n') <- zip3 [0..] ordB (tail ordB), n == n' ]
+    swapAs = swappableIndices ordA
+    swapBs = swappableIndices ordB
+
+swappableIndices :: (Eq a) => [a] -> [Int]
+swappableIndices [] = []
+swappableIndices (a0:as) = [ i | (i, a, a') <- zip3 [0..] (a0:as) as, a == a' ]
 
 findNontrivial :: [ (Int, [Int], [Int], Int) ]
 findNontrivial = do
@@ -69,13 +72,13 @@ findNontrivial = do
 
 ----
 
-chooseFrom :: Int -> [a] -> [[a]]
+chooseFrom :: (Foldable t) => Int -> t k -> [[k]]
 chooseFrom n as
   | n < 0 = error "Negative?"
   | n > m = []
-  | otherwise = chooseFrom' n m as
+  | otherwise = chooseFrom' n m (F.toList as)
   where
-    m = length as
+    m = F.length as
 
 chooseFrom' :: Int -> Int -> [a] -> [[a]]
 chooseFrom' n m as
@@ -85,8 +88,8 @@ chooseFrom' n m as
       [] -> []
       a : as' -> ((a :) <$> chooseFrom' (n - 1) (m - 1) as') ++ chooseFrom' n (m - 1) as'
 
-deleteItem :: Ord k => Map.Map k Int -> k -> Map.Map k Int
-deleteItem bag k = Map.update (\n -> if n <= 1 then Nothing else Just (n - 1)) k bag
+deleteItems :: Ord k => Bag k -> Set.Set k -> Bag k
+deleteItems bag ks = bag Bag.\\ Bag.fromSet ks
 
 graphToDot :: Graph -> String
 graphToDot g = unlines $ ["digraph {"] ++ map indent contents ++ ["}"]

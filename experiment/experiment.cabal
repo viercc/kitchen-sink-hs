@@ -28,6 +28,7 @@ library
     Math.Bipartite,
     Math.QSqrt2,
     Math.DyckWord,
+    Math.BinaryTreeExpr,
 
     Hopf,
 
@@ -73,6 +74,7 @@ library
     
     , containers
     , data-ordlist
+    , multiset
     , hashable
     , vector
     , array

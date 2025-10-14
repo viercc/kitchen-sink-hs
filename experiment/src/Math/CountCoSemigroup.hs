@@ -8,7 +8,7 @@ where
 
 import Data.List (group)
 import qualified Data.MemoCombinators as Memo
-import Math.Combinatorics (partitions)
+import Math.Combinatorics (partitions, binomial)
 import Math.ContingencyTable (uniquePointedContingencyTables)
 
 -- | @partitionsCount n k@ = number of unique partitions of n into k positive integers
@@ -55,14 +55,9 @@ cosemigroupsCount n = sum [countForPartition as | as <- partitions n]
   where
     countForPartition = product . map countByGroup . group
     countByGroup [] = error "group is alway nonempty"
-    countByGroup (a : rest) = combinations (weaktransCosemigroupsCount a + k - 1) k
+    countByGroup (a : rest) = binomial' (weaktransCosemigroupsCount a + k - 1) k
       where
         k = 1 + length rest
 
-combinations :: Int -> Int -> Int
-combinations = Memo.memo2 Memo.integral Memo.integral go
-  where
-    go n m
-      | m < 0 || n < m = 0
-      | m == 0 || m == n = 1
-      | otherwise = (combinations n (m - 1) * (n - m + 1)) `div` m
+binomial' :: Int -> Int -> Int
+binomial' n k = fromInteger (binomial (toInteger n) (toInteger k))

@@ -15,23 +15,24 @@ module Math.ContingencyTable(
 import Data.List (intercalate)
 import qualified Data.Vector.Unboxed as UV
 
-import Math.Combinatorics
-import EquivalenceUtil
+import Math.Combinatorics ( partitionsK, IntBag, subIntBags )
+import EquivalenceUtil ( uniqueUpTo )
+import qualified Data.IntMultiSet as IntBag
 
 -- |
 --
 -- > UV.length sumRows == numRows
 -- > UV.length sumCols == numCols
 -- > UV.length entries == numRows * numCols
-data Table = MkTable
+data Table a = MkTable
   { numRows :: Int,
     numCols :: Int,
     -- | row-major
-    entries :: UV.Vector Int
+    entries :: UV.Vector a
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
-tableContents :: Table -> [[Int]]
+tableContents :: (UV.Unbox a) => Table a -> [[a]]
 tableContents table =
     [[ tab UV.! (i * w + j) | j <- [0 .. w - 1]] | i <- [0 .. h - 1]]
   where
@@ -39,25 +40,36 @@ tableContents table =
     w = numCols table
     tab = entries table
 
-tablesFromMarginal :: UV.Vector Int -> UV.Vector Int -> [Table]
+vecToIntBag :: UV.Vector Int -> IntBag
+vecToIntBag v = IntBag.fromOccurList
+  [ (k,n) | (k,n) <- zip [0..] (UV.toList v), n > 0 ]
+
+vecFromIntBag :: Int -> IntBag -> UV.Vector Int
+vecFromIntBag len bag = UV.generate len (\k -> IntBag.occur k bag)
+
+tablesFromMarginal :: UV.Vector Int -> UV.Vector Int -> [Table Int]
 tablesFromMarginal rows cols
   | UV.sum rows /= UV.sum cols = error "Total sum doesn't match"
-  | otherwise = makeTable <$> genEntries (UV.toList rows) (UV.toList cols)
+  | otherwise = makeTable <$> genEntries (UV.toList rows) (vecToIntBag cols)
   where
+    nrows = UV.length rows
+    ncols = UV.length cols
+    bagToRowList = UV.toList . vecFromIntBag ncols
     makeTable e =
       MkTable
-        { numRows = UV.length rows,
-          numCols = UV.length cols,
-          entries = UV.fromList (concat e)
+        { numRows = nrows,
+          numCols = ncols,
+          entries = UV.fromList $ e >>= bagToRowList
         }
 
+    genEntries :: [Int] -> IntBag -> [[IntBag]]
     genEntries [] _ = [[]]
     genEntries (r : rs) caps = do
-      (d, caps') <- subDistributions r caps
+      (d, caps') <- subIntBags r caps
       ds <- genEntries rs caps'
       pure (d : ds)
 
-generateContingencyTables :: Int -> Int -> Int -> [(UV.Vector Int, UV.Vector Int, [Table])]
+generateContingencyTables :: Int -> Int -> Int -> [(UV.Vector Int, UV.Vector Int, [Table Int])]
 generateContingencyTables h w n =
   do
     rows <- UV.fromList <$> partitionsK n h
@@ -67,19 +79,19 @@ generateContingencyTables h w n =
 newtype Shuffle = Shuffle (UV.Vector Int)
   deriving (Show, Eq)
 
-applyShuffle :: UV.Unbox a => Shuffle -> UV.Vector a -> UV.Vector a
-applyShuffle (Shuffle s) xs = UV.backpermute xs s
+applyShuffle :: UV.Unbox a => Shuffle -> Table a -> Table a
+applyShuffle (Shuffle s) (MkTable rows cols xs) = (MkTable rows cols (UV.backpermute xs s))
 
 -- Generator of permutation groups of indices preserving "runs" (contigent range of indices with equal value)
-shufflesFixingDup :: Eq k => [k] -> [Shuffle]
-shufflesFixingDup ks = Shuffle . permutationVec <$> transpositions
+safeSwaps :: Eq k => [k] -> [Int -> Int]
+safeSwaps [] = []
+safeSwaps ks@(_:ks') = makeSwap <$> swapPositions
   where
-    n = length ks
-    transpositions = [ i | (i,k,k') <- zip3 [0..] ks (tail ks), k == k']
-    permutationVec i = UV.generate n $ \j -> case j of
-      _ | i == j     -> i + 1
-        | i + 1 == j -> i
-        | otherwise  -> j
+    swapPositions = [ i | (i,k,k') <- zip3 [0..] ks ks', k == k']
+    makeSwap i j 
+      | i == j     = i + 1
+      | i + 1 == j = i
+      | otherwise  = j
 
 tableShuffles :: UV.Vector Int -> UV.Vector Int -> [Shuffle]
 tableShuffles rows cols = rowShuffles ++ colShuffles
@@ -87,33 +99,23 @@ tableShuffles rows cols = rowShuffles ++ colShuffles
     h = UV.length rows
     w = UV.length cols
     rowShuffles = do
-      Shuffle rowIxes <- shufflesFixingDup (UV.toList rows)
-      let ixes = UV.fromListN (h * w) [i * w + j | i <- UV.toList rowIxes, j <- [0 .. w - 1]]
+      rowSwap <- safeSwaps (UV.toList rows)
+      let ixes = UV.fromListN (h * w) [rowSwap i * w + j | i <- [0 .. h - 1], j <- [0 .. w - 1]]
       pure (Shuffle ixes)
     colShuffles = do
-      Shuffle colIxes <- shufflesFixingDup (UV.toList cols)
-      let ixes = UV.fromListN (h * w) [i * w + j | i <- [0 .. h - 1], j <- UV.toList colIxes ]
+      colSwap <- safeSwaps (UV.toList cols)
+      let ixes = UV.fromListN (h * w) [i * w + colSwap j | i <- [0 .. h - 1], j <- [0 .. w - 1] ]
       pure (Shuffle ixes)
 
-contingencyTables :: Int -> Int -> Int -> [Table]
+contingencyTables :: Int -> Int -> Int -> [Table Int]
 contingencyTables h w n = generateContingencyTables h w n >>= \(_, _, tabs) -> tabs
 
-uniqueContingencyTables :: Int -> Int -> Int -> [Table]
+uniqueContingencyTables :: Int -> Int -> Int -> [Table Int]
 uniqueContingencyTables h w n =
   generateContingencyTables h w n >>= \(rows, cols, tabs) ->
-    uniqueTableModulo (tableShuffles rows cols) tabs
+    uniqueUpTo (applyShuffle <$> tableShuffles rows cols) tabs
 
-uniqueTableModulo :: [Shuffle] -> [Table] -> [Table]
-uniqueTableModulo _ [] = []
-uniqueTableModulo shuffles tables = rebuildTable <$> modTables
-  where
-    bareTables = entries <$> tables
-    modTables = uniqueUpTo (applyShuffle <$> shuffles) bareTables
-    h = numRows (head tables)
-    w = numCols (head tables)
-    rebuildTable = MkTable h w
-
-generatePointedContingencyTables :: Int -> Int -> Int -> [(UV.Vector Int, UV.Vector Int, [Table])]
+generatePointedContingencyTables :: Int -> Int -> Int -> [(UV.Vector Int, UV.Vector Int, [Table Int])]
 generatePointedContingencyTables h w n =
   do
     ptRow <- [n, n - 1 .. 0]
@@ -124,17 +126,17 @@ generatePointedContingencyTables h w n =
     let cols = UV.fromList (ptCol : freeCols)
     pure (rows, cols, tablesFromMarginal rows cols)
 
-pointedContingencyTables :: Int -> Int -> Int -> [Table]
+pointedContingencyTables :: Int -> Int -> Int -> [Table Int]
 pointedContingencyTables h w n = generatePointedContingencyTables h w n >>= \(_, _, tabs) -> tabs
 
-uniquePointedContingencyTables :: Int -> Int -> Int -> [Table]
+uniquePointedContingencyTables :: Int -> Int -> Int -> [Table Int]
 uniquePointedContingencyTables h w n =
   generatePointedContingencyTables h w n >>= \(rows, cols, tabs) ->
     let -- Set the duplicity of the first element (the pointed part) to -1.
         -- The actual duplicity doesn't matter and doesn't want it to move.
         rows' = rows UV.// [(0, -1)]
         cols' = cols UV.// [(0, -1)]
-     in uniqueTableModulo (tableShuffles rows' cols') tabs
+     in uniqueUpTo (applyShuffle <$> tableShuffles rows' cols') tabs
 
 -- * Pretty printing
 
@@ -144,10 +146,10 @@ padStringTable strCells = zipWith leftPad cellWidths <$> strCells
     leftPad n s = replicate (n - length s) ' ' ++ s
     cellWidths = foldr (zipWith max . fmap length) (repeat 0) strCells
 
-pprTable :: Table -> String
+pprTable :: (UV.Unbox a, Show a) => Table a -> String
 pprTable
   = unlines . fmap unwords . padStringTable . fmap (fmap show) . tableContents
 
-latexTable :: Table -> String
+latexTable :: (UV.Unbox a, Show a) => Table a -> String
 latexTable
   = intercalate " \\\\ " . fmap (intercalate " & ") . padStringTable . fmap (fmap show) . tableContents
