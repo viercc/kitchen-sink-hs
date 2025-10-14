@@ -1,8 +1,6 @@
 module Math.AdditionChain where
 
-import Data.Ord (comparing)
-import Data.List (sortBy)
-import Data.Bits
+import Data.List (sort)
 
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -43,42 +41,48 @@ data SolveState = SolveState
 isCompleted :: SolveState -> Bool
 isCompleted state = IntSet.null (stateTarget state)
 
-newtype Dep = Dep { unDep :: IntSet }
-  deriving (Show, Eq)
-
-instance Ord Dep where
-  compare = comparing (IntSet.size . unDep) <>
-            comparing unDep
+-- (numUnknown, unknown, expr)
+type Dep = (Int, [Int], (Int, Int))
 
 solveStep :: SolveState -> [SolveState]
 solveStep (SolveState target known) =
   case IntSet.maxView target of
     Nothing -> error "step called on completed state"
     Just (x, target') ->
-      case immediately x of
-        [] -> do ((i,j), Dep newDeps) <- sortBy (comparing snd) $ do
-                   i <- [1 .. x `div` 2]
-                   let j = x - i
-                       newDeps = IntSet.fromList [i,j] IntSet.\\ usables
-                   return ((i,j), Dep newDeps)
-                 let target'' = target' `IntSet.union` newDeps
-                     known'' = IntMap.insert x (i,j) known
-                 return $ SolveState target'' known''
-        (i,j):_ -> [SolveState target' (IntMap.insert x (i,j) known)]
+      case sort (genDeps x target') of
+        -- There is a "both known" case
+        (0, _, (i,j)) : _ -> [SolveState target' (IntMap.insert x (i,j) known)]
+        -- There aren't such one
+        deps -> do
+          (_,unknowns,(i,j)) <- deps
+          let target'' = target' `IntSet.union` IntSet.fromList unknowns
+              known'' = IntMap.insert x (i,j) known
+          return $ SolveState target'' known''
   where
-    usables = IntSet.insert 1 $ IntSet.union target (IntMap.keysSet known)
-    immediately x =
-      let us = takeWhile (<= x `div` 2) (IntSet.toAscList usables)
-      in [ (i,j) | i <- us
-                 , let j = x - i
-                 , IntSet.member j usables ]
+    genDeps x target' = do
+      -- Available numbers without requireing no new dependency
+      let usables = IntSet.union target' (IntSet.insert 1 (IntMap.keysSet known))
+      -- Generate (i,j) such that (1 <= i <= j), (i + j == x)
+      i <- [1 .. x `div` 2]
+      let j = x - i
+          unknowns = filter (`IntSet.notMember` usables) [j,i]
+          numUnknowns
+            | i == j = min 1 (length unknowns)
+            | otherwise = length unknowns
+      pure (numUnknowns, unknowns, (i,j))
+
+greedySolve :: IntSet -> Chain
+greedySolve target0 = loop initialState
+  where
+    initialState = SolveState target0 IntMap.empty
+    loop state
+      | isCompleted state = stateKnown state
+      | otherwise = case solveStep state of
+          [] -> error "solveStep must return non-empty!"
+          state' : _ -> loop state'
 
 upperBound :: IntSet -> Int
-upperBound target =
-  let x = IntSet.foldl' (.|.) 0 target
-  in logBase2 x + popCount x
-  where
-    logBase2 x = finiteBitSize x - 1 - countLeadingZeros x
+upperBound target = IntMap.size (greedySolve target)
 
 lowerBound :: SolveState -> Int
 lowerBound (SolveState target known) = IntSet.size target + IntMap.size known
