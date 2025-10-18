@@ -29,6 +29,7 @@ library
     Math.QSqrt2,
     Math.DyckWord,
     Math.BinaryTreeExpr,
+    Math.BalanceFreePartition,
 
     Hopf,
 
