@@ -16,8 +16,6 @@ library
     Newtypes, Cardinality, CheapRecord, CoerceUnder,
     LCS,
     EquivalenceUtil,
-    
-    InternalCategory,
 
     Math.AdditionChain,
     Math.Combinatorics,
