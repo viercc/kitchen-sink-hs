@@ -42,6 +42,8 @@ library
 
     Rank2.Unzip,
     
+    Partial,
+    Partial.Functor,
     Partial.Monad,
     Partial.Monoidal,
     Partial.Poifree,
@@ -90,6 +92,7 @@ library
     , lens
     , selective
     , semialign
+    , witherable
     , rank2classes
     , these
     
