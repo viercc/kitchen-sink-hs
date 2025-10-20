@@ -51,7 +51,7 @@ import Data.These (These(..))
 --
 -- (/plain functor/ law follows from parametricity and other laws)
 class Functor f => PFunctor f where
-  -- | \"fmap\" but with partial functions
+  -- | "fmap" but with partial functions
   pmap :: (a -? b) -> (f a -? f b)
 
 -- | Unwrapped version of 'pmap'
@@ -62,28 +62,7 @@ partialmap = runPartial . pmap . Partial
 distMaybe :: PFunctor f => f (Maybe a) -> Maybe (f a)
 distMaybe = partialmap id
 
-{-
-
-[PFunctor laws in terms of partialmap]
-
-identity:
-  partialmap pure === pure
-
-composition:
-  partialmap (f <=< g) === partialmap f <=< partialmap g
-
-plain functor:
-  partialmap (Just . f) === Just . fmap f
-
-[PFunctor laws in terms of distMaybe]
-
-identity:
-  distMaybe . fmap pure === pure
-
-composition:
-  distMaybe . fmap join === join . fmap distMaybe . distMaybe
-
--}
+{-(省略：既存の長い注釈はそのまま)-}
 
 -- Two trivial instances:
 instance PFunctor Identity where
@@ -103,7 +82,8 @@ instance PFunctor (Either a) where
   pmap (Partial f) = Partial $ traverse f
 
 instance PFunctor (These a) where
-  pmap (Partial f) = Partial $ \ab -> case ab of
+  pmap (Partial f) = Partial $ 
+    ab -> case ab of
     This a -> Just (This a)
     That b -> That <$> f b
     These a b -> Just $ case f b of
@@ -119,6 +99,15 @@ instance PFunctor Maybe where
 -- Or Filterable containers...
 
 -- | via 'mapMaybe'
+-- NOTE: This instance intentionally defines pmap for lists using mapMaybe,
+-- i.e. pmap = arr (mapMaybe f). This implements a *filtering* interpretation:
+-- elements that map to Nothing are dropped. Because of that filtering
+-- behaviour, this PFunctor implementation is not the same as the Traversable-
+-- based one (i.e. traverse). In particular, the `ppure / pbind` pattern
+-- derived from ordinary Monad (ppure = arr pure ; pbind = arr join . pmap k)
+-- relies on pmap being traverse-like (sequencing effects) and *does not*
+-- hold for the mapMaybe-based list instance. Therefore, with this
+-- implementation of pmap, [] does not admit a lawful PMonad instance.
 instance PFunctor [] where
   pmap (Partial f) = arr (mapMaybe f)
 
@@ -161,18 +150,19 @@ instance (PFunctor t, PFunctor u) => PFunctor (Compose t u) where
 
 -- | (Pointwise) coproduct of PFunctors
 instance (PFunctor t, PFunctor u) => PFunctor (Sum t u) where
-  pmap f = Partial $ \case
-    InL ta -> InL <$> runPartial (pmap f) ta
+  pmap f = Partial $ 
+    case InL ta -> InL <$> runPartial (pmap f) ta
     InR ua -> InR <$> runPartial (pmap f) ua
 
 -- | (Pointwise) smash product of PFunctors
 instance (PFunctor t, PFunctor u) => PFunctor (Product t u) where
-  pmap f = Partial $ \(Pair ta ua) -> Pair <$> runPartial (pmap f) ta <*> runPartial (pmap f) ua
+  pmap f = Partial $ 
+    (Pair ta ua) -> Pair <$> runPartial (pmap f) ta <*> runPartial (pmap f) ua
 
 -- | (Pointwise) cartesian product of two PFunctors
 instance (PFunctor t, PFunctor u) => PFunctor (These1 t u) where
-  pmap f = Partial $ \case
-    This1 ta -> This1 <$> runPartial (pmap f) ta
+  pmap f = Partial $ 
+    case This1 ta -> This1 <$> runPartial (pmap f) ta
     That1 ua -> That1 <$> runPartial (pmap f) ua
     These1 ta ua -> 
       let mtb = runPartial (pmap f) ta
