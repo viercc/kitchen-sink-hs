@@ -51,7 +51,7 @@ import Data.These (These(..))
 --
 -- (/plain functor/ law follows from parametricity and other laws)
 class Functor f => PFunctor f where
-  -- | \"fmap\" but with partial functions
+  -- | "fmap" but with partial functions
   pmap :: (a -? b) -> (f a -? f b)
 
 -- | Unwrapped version of 'pmap'
@@ -119,6 +119,15 @@ instance PFunctor Maybe where
 -- Or Filterable containers...
 
 -- | via 'mapMaybe'
+-- NOTE: This instance intentionally defines pmap for lists using mapMaybe,
+-- i.e. pmap = arr (mapMaybe f). This implements a *filtering* interpretation:
+-- elements that map to Nothing are dropped. Because of that filtering
+-- behaviour, this PFunctor implementation is not the same as the Traversable-
+-- based one (i.e. traverse). In particular, the `ppure / pbind` pattern
+-- derived from ordinary Monad (ppure = arr pure ; pbind = arr join . pmap k)
+-- relies on pmap being traverse-like (sequencing effects) and *does not*
+-- hold for the mapMaybe-based list instance. Therefore, with this
+-- implementation of pmap, [] does not admit a lawful PMonad instance.
 instance PFunctor [] where
   pmap (Partial f) = arr (mapMaybe f)
 
