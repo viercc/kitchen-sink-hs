@@ -247,17 +247,20 @@ instance PMonad NonEmpty where
 This is a "lifted" case, thus showing only naturality
 suffice.
 
-* Instead of naturality of pbind, prove naturality of pjoin
+* Instead of directly prove naturality of pbind,
+  the following auxiliary equation (A) can be proven:
 
-    pmap f . pjoin === pjoin . pmap (pmap f)
+    (A) pmap f . arr join === arr join . pmap (pmap f)
 
-  which implies naturality of pbind.
+  because
 
     pmap f . pbind g
-    = pmap f . pjoin . pmap g
-      {naturality of pjoin}
+      {definition of pbind}
+    = pmap f . arr join . pmap g
+      {use (A)}
     = pjoin . pmap (pmap f) . pmap g
     = pjoin . pmap (pmap f . pmap g)
+      {definition of pbind}
     = pbind (pmap f . g)
 
 * To avoid wrapping/unwrapping of @Partial@ clutters the proof,
@@ -276,7 +279,7 @@ suffice.
     pmap' f . pure === fmap pure . f
     @
 
-  - naturality of pjoin:
+  - equation (A) (for naturality of pjoin):
 
     @
     pmap' f . join === fmap join . pmap' (pmap' f)
@@ -292,7 +295,7 @@ pmap' f . pure
     Just b  -> Just (pure b)
  = fmap pure . f
 
-[naturality of pbind]
+[(A) for naturality of pbind]
 
 pmap' f . join
  = nonEmpty . mapMaybe f . toList . join
@@ -336,31 +339,30 @@ pmap' f . join
    { join . fmap (maybeToList . g) = mapMaybe g }
  = nonEmpty . join . fmap toList
      . mapMaybe (pmap' f) . toList
-   { (*) nonEmpty . join . fmap toList = fmap join . nonEmpty }
+   { (B) }
  = fmap join . nonEmpty . mapMaybe (pmap' f) . toList
  = fmap join . pmap' (pmap' f)
 
-(*)
+(B) nonEmtpy . join . fmap toList = fmap join . nonEmpty
+        :: [NonEmpty a] -> Maybe (NonEmpty a)
 
-nonEmtpy . join . fmap toList
-  = fmap join . nonEmpty    :: [NonEmpty a] -> Maybe (NonEmpty a)
+  (proof)
+  case analysis on outer list:
 
-case analysis on outer list:
+    nonEmpty (join (fmap toList []))
+    = nonEmpty (join [])
+    = nonEmpty []
+    = Nothing
+    = fmap join Nothing
+    = fmap join (nonEmpty [])
 
-nonEmpty (join (fmap toList []))
- = nonEmpty (join [])
- = nonEmpty []
- = Nothing
- = fmap join Nothing
- = fmap join (nonEmpty [])
-
-nonEmpty (join (fmap toList (xs : xss)))
- = nonEmpty (join (fmap toList (toList (xs :| xss))))
- = nonEmpty (toList (join (xs :| xss)))
-  -- nonEmpty . toList = Just
- = Just (join (xs :| xss))
- = fmap join (Just (xs : xss))
- = fmap join (nonEmpty (xs : xss))
+    nonEmpty (join (fmap toList (xs : xss)))
+    = nonEmpty (join (fmap toList (toList (xs :| xss))))
+    = nonEmpty (toList (join (xs :| xss)))
+      -- nonEmpty . toList = Just
+    = Just (join (xs :| xss))
+    = fmap join (Just (xs : xss))
+    = fmap join (nonEmpty (xs : xss))
 
 -}
 
