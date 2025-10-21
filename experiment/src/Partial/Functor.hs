@@ -3,14 +3,28 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Partial.Functor where
+{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+module Partial.Functor(
+  PFunctor(..),
+  partialmap,
+  distMaybe,
+
+  Smash(..), smash,
+  Filtering(..)
+) where
 
 import Prelude hiding (id, (.))
 import Control.Category ( Category(..) )
 import Control.Arrow ( Arrow(..) )
 
 import Witherable (Filterable(..))
-import Data.Coerce ( coerce )
+import Data.Coerce ( coerce, Coercible )
+
+import Data.List.NonEmpty (NonEmpty(), nonEmpty)
+import Data.These (These(..))
+import Data.Foldable (Foldable(toList))
 
 import Data.Functor.Const (Const(..))
 import Data.Functor.Identity ( Identity(..) )
@@ -19,11 +33,20 @@ import Data.Functor.Product (Product(..))
 import Data.Functor.Compose (Compose (..))
 import Data.Functor.These ( These1(..) )
 
-import Data.List.NonEmpty (NonEmpty(), nonEmpty)
-import Data.Foldable (Foldable(toList))
-
 import Partial
-import Data.These (These(..))
+
+import GHC.Generics
+    ( Generic1(..),
+      V1,
+      U1(..),
+      Par1(Par1),
+      Rec1(Rec1),
+      K1(K1),
+      M1(M1),
+      type (:+:)(..),
+      type (:*:)(..),
+      type (:.:)(..),
+      Generically1(..) )
 
 -- * Functors from Partial to Partial
 
@@ -166,7 +189,7 @@ instance Filterable t => PFunctor (Filtering t) where
 
 -- | Composition of PFunctors
 instance (PFunctor t, PFunctor u) => PFunctor (Compose t u) where
-  pmap f = arr Compose . pmap (pmap f) . arr getCompose
+  pmap f = overP Compose Compose $ pmap (pmap f)
 
 -- | (Pointwise) coproduct of PFunctors
 instance (PFunctor t, PFunctor u) => PFunctor (Sum t u) where
@@ -191,3 +214,43 @@ instance (PFunctor t, PFunctor u) => PFunctor (These1 t u) where
            (Just tb, Nothing) -> Just $ This1 tb
            (Nothing, Just ub) -> Just $ That1 ub
            (Just tb, Just ub) -> Just $ These1 tb ub
+
+---- Generics ----
+
+instance (PFunctor (Rep1 t), Generic1 t) => PFunctor (Generically1 t) where
+  pmap f = overP Generically1 Generically1 (arr to1 . pmap f . arr from1)
+
+instance PFunctor V1 where
+  pmap _ = Partial $ \case {}
+
+instance PFunctor U1 where
+  pmap _ = Partial $ const (Just U1)
+
+instance PFunctor (K1 i c) where
+  pmap _ = Partial $ \(K1 c) -> Just (K1 c)
+
+instance PFunctor Par1 where
+  pmap = coerce
+
+instance PFunctor t => PFunctor (Rec1 t) where
+  pmap f = overP Rec1 Rec1 $ pmap f
+
+instance PFunctor t => PFunctor (M1 i m t) where
+  pmap f = overP M1 M1 $ pmap f
+
+instance (PFunctor t, PFunctor u) => PFunctor (t :+: u) where
+  pmap f = Partial $ \case
+    L1 ta -> L1 <$> runPartial (pmap f) ta
+    R1 ua -> R1 <$> runPartial (pmap f) ua
+
+instance (PFunctor t, PFunctor u) => PFunctor (t :*: u) where
+  pmap f = Partial $ \case
+    ta :*: ua -> (:*:) <$> runPartial (pmap f) ta <*> runPartial (pmap f) ua
+
+instance (PFunctor t, PFunctor u) => PFunctor (t :.: u) where
+  pmap f = overP Comp1 Comp1 $ pmap (pmap f)
+
+-- Utility
+
+overP :: (Coercible a b, Coercible c d) => (b -> a) -> (c -> d) -> (b -? c) -> (a -? d)
+overP _ _ = coerce
