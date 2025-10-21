@@ -3,7 +3,11 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
-module Partial.Monad where
+module Partial.Monad(
+  PMonad(..), pjoin, pmapDefault,
+
+  Pt(..)
+) where
 
 import Prelude hiding (id, (.))
 import Control.Category (Category(..))
@@ -17,6 +21,8 @@ import Data.Functor.Product (Product (..))
 import Data.Functor.These (These1 (..))
 import Data.These
 import Data.Coerce (coerce)
+import Data.Boring (Absurd)
+import Data.Functor.Const (Const)
 
 -- | Monad on 'Partial'.
 -- 
@@ -54,6 +60,60 @@ import Data.Coerce (coerce)
 --     pmap f . pbind g === pbind (pmap f . g)
 --     @
 -- 
+-- With these laws, it can be shown that @'pmap'@ must be
+-- equivalent to the following ('pmapDefault').
+-- 
+-- @
+-- pmap :: (a -? b) -> (m a -? m b)
+-- pmap f === pmapDefault f === pbind (ppure . f)
+-- @
+-- 
+-- Conversely, with the first three laws (left and right unit law, associativity) plus
+-- @pmap === pmapDefault@ shows /naturality of ppure/ and /naturality of pbind/.
+-- Therefore, one may instead show the first three laws + @pmap === pmapDefault@ to
+-- prove their @PMonad@ instance is valid.
+
+{-
+
+[NOTE: pmapDefault]
+
+@(pbind, ppure)@ determines @pmap@:
+
+- /default pmap/: 
+
+  > pmap f === pbind (ppure . f)
+
+> (proof)
+> pmap f
+>   === pmap f . id
+>     {right unit}
+>   === pmap f . pbind ppure
+>     {naturality of pbind}
+>   === pbind (pmap f . ppure)
+>     {naturality of ppure}
+>   === pbind (ppure . f)
+
+Conversely, from left and right unit laws, associativity, and default @pmap@,
+two naturality condition follows.
+
+> (proof:ppure-naturality)
+> pmap f . ppure
+>     {default pmap}
+>   === pbind (ppure . f) . ppure
+>     {right unit}
+>   === ppure . f
+
+> (proof:pbind-naturality)
+> pmap f . pbind g
+>     {default pmap}
+>   === pbind (ppure . f) . pbind g
+>     {associativity}
+>   === pbind (pbind (ppure . f) . g)
+>     {default pmap}
+>   === pbind (pmap f . g)
+
+
+-}
 class (PFunctor m) => PMonad m where
   ppure :: a -? m a
   pbind :: (a -? m b) -> m a -? m b
@@ -61,6 +121,11 @@ class (PFunctor m) => PMonad m where
 -- | > pjoin = pbind id
 pjoin :: PMonad m => m (m a) -? m a
 pjoin = pbind id
+
+-- | @pmap@ can be implemented using only @ppure@ and @pbind@.
+--   (same to the relation between 'fmap' and 'Control.Mona.liftM') 
+pmapDefault :: PMonad m => (a -? b) -> (m a -? m b)
+pmapDefault f = pbind (ppure . f)
 
 -- | @PMonad m@ induces @Monad@ structure on @Maybe (m _)@.
 newtype Pt m a = Pt { unPt :: Maybe (m a) }
@@ -90,18 +155,29 @@ instance PMonad Maybe where
 --  Pt {unPt = Nothing},      Pt {unPt = Just Nothing}, Pt {unPt = Just (Just "xx")}
 -- ]
 
+-- | @Pt (Either a) ~ Either (Maybe a)@
 instance PMonad (Either a) where
   ppure = arr pure
   pbind k = arr join . pmap k
 
+-- | @Pt ((,) a) ~ WriterT a Maybe@
 instance Monoid a => PMonad ((,) a) where
   ppure = arr pure
   pbind k = arr join . pmap k
 
+-- | @Pt (These a) ~ MaybeT (Writer (Maybe a))@
+instance Semigroup a => PMonad (These a) where
+  ppure = arr pure
+  pbind k = arr join . pmap k
+
+-- | @Pt (Const Void) ~ Proxy@
+instance Absurd a => PMonad (Const a) where
+  ppure = zero
+  pbind _ = zero
 
 {-
 
-[NOTE: You can use usual @Monad@ natural with respect to @pmap@]
+[NOTE: Lifted PMonad ]
 
 Whenever @ppure, pbind@ is based off of @Monad@ like above instances,
 i.e.
@@ -109,84 +185,56 @@ i.e.
 - @ppure = arr pure@
 - @pbind k = arr join . pmap k@
 
-You only need to check naturality conditions. For example,
-right unit law can be shown as the following.
+Let's call such @PMonad@ a \"lifted\" PMonad.
 
-  pbind ppure
-   = arr join . pmap ppure
-   = arr join . pmap (arr pure)
-   = arr join . arr (fmap pure)
-   = arr (join . fmap pure)
-   = arr id
-   = id
+For a lifted PMonad, the first three laws follows from the two naturality laws.
+For example, associativity can be shown as the following.
 
-Left unit and associativity law can be done similarly.
+  pbind f . pbind g
+   = arr join . pmap f . pbind g
+      {naturality of pbind}
+   = arr join . pbind (pmap f . g)
+   = arr join . arr join . pmap (pmap f . g)
+   = arr (join . join) . pmap (pmap f . g)
+      {Monad law(associativity)}
+   = arr (join . fmap join) . pmap (pmap f . g)
+   = arr join . arr (fmap join) . pmap (pmap f . g)
+      {plain functor}
+   = arr join . pmap (arr join) . pmap (pmap f) . pmap g
+   = arr join . pmap (arr join . pmap f . g)
+   = arr join . pmap (pbind f . g)
+   = pbind (pbind f . g)
+
+Left and right unit laws can be done similarly.
 
 -}
 
 {-
 
-[NOTE: Using @Monad@ and @Traverseable@]
+[NOTE: Lifted and Traversable-based ]
 
-For a @PMonad@ with @ppure, pjoin@ defined using plain @Monad@
-as previous note, if its @PFunctor@ instance is defined as
-@pmap = smash@ using 'traverse', naturality conditions reduces to
-following equations.
+For a lifted @PMonad@ (@ppure, pjoin@ are defined by @Monad@),
+the previous note explains naturality conditions imply other three laws.
 
-(2) traverse f . pure === fmap pure . f
-(3) traverse f . join === fmap join . traverse (traverse f)
+If its @PFunctor@ instance is defined as
+@pmap f = smash f = Partial (traverse f)@, the converse also hold.
+For such @PMonad@, the first three laws (left and right unit, associativity) imply
+two naturality laws.
 
-Note that @traverse f . pure === fmap pure . f@ hold
-if @pure x@ does not discard 'x',
-i.e. anything except 'Data.Proxy.Proxy' monad.
+The reason is, for such @PMonad@, @pmap = pmapDefault@ always hold, and as
+[Note: pmapDefault] explains, (pmap = pmapDefault && the first three) implies naturality laws.
 
-    (lemma) Since @sequenceA (pure Nothing) === Just _@
-    implies @pure Nothing@ does not use @Nothing@ to construct its value.
-    Therefore, if @pure x@ does depend on @x@, @sequenceA (pure Nothing) === Nothing@.
+  (proof)
+  @pmap = pmapDefault@ can be written as an unwrapped version:
 
-    (proof)
-    traverse f (pure a)
-     = sequenceA (fmap f (pure a))
-     = sequenceA (pure (f a))
-     = case f a of
-         Nothing -> sequenceA (pure Nothing)
-         Just b  -> sequenceA (pure (Just b))
-     = case f a of
-         Nothing -> Nothing
-         Just b  -> sequenceA . fmap Just (pure b)
-     = case f a of
-         Nothing -> Nothing
-         Just b  -> Just (pure b)
-     = fmap pure (f a)
+    traverse f = fmap join . traverse (fmap pure . f)
 
-[naturality of ppure]
+  And this is true by the following computation.
 
-pmap (Partial f) . ppure
- = Partial (traverse f) . Partial (Just . pure)
- = Partial (traverse f <=< Just . pure)
- = Partial (traverse f . pure)
- = Partial $ fmap pure . f
- = Partial $ Just . pure <=< f
- = arr pure . Partial f
- = ppure . Partial f
-
-[naturality of pbind]
-
-pmap (Partial f) . pbind (Partial g)
- = pmap (Partial f) . arr join . pmap (Partial g)
- = Partial (traverse f) . Partial (Just . join) . Partial (traverse g)
- = Partial (traverse f <=< Just join <=< traverse g)
- = Partial (traverse f . join <=< traverse g)
- = Partial (fmap join . traverse (traverse f) <=< traverse g)
- = Partial (fmap join . (traverse (traverse f) <=< traverse g))
-   -- If the @Monad@ instance used for (<=<) is a commutative monad,
-   --   @traverse f1 <=< traverse f2 === traverse (f1 <=< f2)@
-   -- hold. The (<=<) used here is @Monad Maybe@ which is commutative.
- = Partial (fmap join . traverse (traverse f <=< g))
- = Partial (Just join <=< traverse (traverse f <=< g))
- = arr join . pmap (Partial (traverse f <=< g))
- = arr join . pmap (pmap (Partial f) . g)
- = pbind (pmap (Partial f) . g)
+    fmap join . traverse (fmap pure . f)
+    === fmap join . fmap (fmap pure) . traverse f
+    === fmap (join . fmap pure) . traverse f
+    === traverse f
 
 -}
 
@@ -196,84 +244,106 @@ instance PMonad NonEmpty where
 
 {-
 
-This is "using usual Monad" case, thus showing only naturality
+This is a "lifted" case, thus showing only naturality
 suffice.
+
+* Instead of naturality of pbind, prove naturality of pjoin
+
+    pmap f . pjoin === pjoin . pmap (pmap f)
+
+  which implies naturality of pbind.
+
+    pmap f . pbind g
+    = pmap f . pjoin . pmap g
+      {naturality of pjoin}
+    = pjoin . pmap (pmap f) . pmap g
+    = pjoin . pmap (pmap f . pmap g)
+    = pbind (pmap f . g)
+
+* To avoid wrapping/unwrapping of @Partial@ clutters the proof,
+  define the unwrapped versions as below:
+
+  @
+  pmap' :: (a -> Maybe b) -> NonEmpty a -> Maybe (NonEmpty b)
+  pmap' f = nonEmpty . mapMaybe f . toList
+  @
+
+  By performing unwrapping, naturality laws can be written as:
+
+  - naturality of ppure:
+
+    @
+    pmap' f . pure === fmap pure . f
+    @
+
+  - naturality of pjoin:
+
+    @
+    pmap' f . join === fmap join . pmap' (pmap' f)
+    @
 
 [naturality of ppure]
 
-pmap (Partial f) . ppure
- = Partial (nonEmpty . mapMaybe f . toList) . Partial (Just . singleton)
- = Partial (nonEmpty . mapMaybe f . toList <=< Just . singleton)
- = Partial (nonEmpty . mapMaybe f . toList . singleton)
- = Partial (\a -> nonEmpty (mapMaybe f [a]))
- = Partial $ \a -> case f a of
+pmap' f . pure
+ = nonEmpty . mapMaybe f . toList . pure
+ = \a -> nonEmpty (mapMaybe f [a])
+ = \a -> case f a of
     Nothing -> Nothing
-    Just b  -> Just (singleton b)
- = Partial $ fmap singleton . f
- = Partial $ Just . singleton <=< f
- = ppure . Partial f
+    Just b  -> Just (pure b)
+ = fmap pure . f
 
 [naturality of pbind]
 
-instead prove naturality of pjoin
+pmap' f . join
+ = nonEmpty . mapMaybe f . toList . join
+   { (toList :: NonEmpty ~> []) is a monad morphism }
+ = nonEmpty . mapMaybe f . join . fmap toList . toList
+   {
+     mapMaybe f . join
+      = (join . fmap (maybeToList . f)) . join
+      = join . join . fmap (fmap (maybeToList . f))
+      = join . fmap (join . fmap (maybeToList . f))
+      = join . fmap (mapMaybe f)
+   }
+ = nonEmpty . join . fmap (mapMaybe f) . fmap toList . toList
+ = nonEmpty . join . fmap (mapMaybe f . toList)      . toList
+  {
+    unNonEmpty . nonEmpty = id
+      where
+        unNonEmpty :: Maybe (NonEmpty a) -> [a]
+        unNonEmpty = join . fmap toList . maybeToList
+    unNonEmpty (nonEmpty [])
+      = unNonEmpty Nothing
+      = join (fmap toList []) = []
+    unNonEmpty (nonEmpty (xs : xss))
+      = unNonEmpty (Just (xs :| xss))
+      = join $ fmap toList [xs :| xss]
+      = join [ xs : xss ]
+      = xs : xss
+  }
+ = nonEmpty . join . fmap (unNonEmpty . nonEmpty . mapMaybe f . toList) . toList
 
-  pmap f . pjoin === pjoin . pmap (pmap f)
-
-which implies naturality of pbind
-
-  pmap f . pbind g
-   = pmap f . pjoin . pmap g
-   = pjoin . pmap (pmap f) . pmap g
-   = pjoin . pmap (pmap f . pmap g)
-   = pbind (pmap f . g)
-
-pmap (Partial f) . pjoin
- = pmap (Partial f) . arr join
- = Partial (nonEmpty . mapMaybe f . toList) . Partial (Just . join) . Partial (nonEmpty . mapMaybe g . toList)
- = Partial $
-    nonEmpty . mapMaybe f . toList <=< Just . join
- = Partial $
-    nonEmpty . mapMaybe f . toList . join
- = Partial $
-    nonEmpty . mapMaybe f . join . fmap toList . toList
-   -- mapMaybe f . join
-   --  = (join . fmap (maybeToList . f)) . join
-   --  = join . join . fmap (fmap (maybeToList . f))
-   --  = join . fmap (join . fmap (maybeToList . f))
-   --  = join . fmap (mapMaybe f)
- = Partial $
-    nonEmpty . join . fmap (mapMaybe f) . fmap toList . toList
- = Partial $
-    nonEmpty . join . fmap (mapMaybe f . toList) . toList
- = Partial $
-    nonEmpty . join . fmap (unNonEmpty . nonEmpty . mapMaybe f . toList) . toList
-      where unNonEmpty = maybe [] toList = join . fmap toList . maybeToList
- = Partial $
-    nonEmpty . join . fmap join . fmap (fmap toList . maybeToList)
-      . fmap (nonEmpty . mapMaybe f . toList) . toList
- = Partial $
-    nonEmpty . join . join . fmap (fmap toList)
-      . fmap (maybeToList . nonEmpty . mapMaybe f . toList) . toList
-
- = Partial $
-    nonEmpty . join . fmap toList
-      . join . fmap (maybeToList . nonEmpty . mapMaybe f . toList) . toList
- = Partial $
-    nonEmpty . join . fmap toList
-      . mapMaybe (nonEmpty . mapMaybe f . toList) . toList
-
-   -- (*)
-
- = Partial $
-    fmap join . nonEmpty
-      . mapMaybe (nonEmpty . mapMaybe f . toList) . toList
- = arr join . pmap (Partial (nonEmpty . mapMaybe f . toList))
- = arr join . pmap (pmap f)
+ = nonEmpty . join . fmap (unNonEmpty . pmap' f) . toList
+ 
+ = nonEmpty . join . fmap join . fmap (fmap toList)
+     . fmap (maybeToList . pmap' f) . toList
+ 
+ = nonEmpty . join . join . fmap (fmap toList)
+     . fmap (maybeToList . pmap' f) . toList
+ 
+ = nonEmpty . join . fmap toList . join
+     . fmap (maybeToList . pmap' f) . toList
+   { join . fmap (maybeToList . g) = mapMaybe g }
+ = nonEmpty . join . fmap toList
+     . mapMaybe (pmap' f) . toList
+   { (*) nonEmpty . join . fmap toList = fmap join . nonEmpty }
+ = fmap join . nonEmpty . mapMaybe (pmap' f) . toList
+ = fmap join . pmap' (pmap' f)
 
 (*)
 
 nonEmtpy . join . fmap toList
-  === fmap join . nonEmpty    :: [NonEmpty a] -> Maybe (NonEmpty a)
+  = fmap join . nonEmpty    :: [NonEmpty a] -> Maybe (NonEmpty a)
 
 case analysis on outer list:
 
