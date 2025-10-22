@@ -211,6 +211,44 @@ Left and right unit laws can be done similarly.
 
 {-
 
+[NOTE: @ppure@ is either 'zero' or @'arr' _@]
+
+By parametricity, @(ppure :: forall a. a -? m a)@
+does not change the shape of the returned value
+@(runPartial ppure x :: Maybe (m a))@ depending on which type @a@
+is used. Therefore, @ppure@ is either one of the following two:
+
+- @ppure = zero  = Partial (const Nothing)@
+- There exists @s :: forall a. a -> m a@ such that
+  @ppure = arr s = Partial (Just . s)@.
+
+In the lifted case, @ppure@ is the latter with @s = pure@.
+
+The only @PMonad m@ with the former case @ppure = zero@ is
+the one which is isomorphic to empty functor @Const 'Void'@ (or 'V1').
+
+The crucial point is given @ppure = zero@ and /left unit/ law,
+any @f :: a -> m b@ must be equal to @zero@ for any type @a,b@.
+
+  (proof)
+    f
+      {assumption: left unit}
+    = pbind f . ppure
+      {assumption: ppure = zero}
+    = pbind f . zero
+      {property of zero morphism}
+    = zero
+
+If a type @X@ satisfy "for any @a@, @f :: a -? X@ must be @f = zero@",
+@X@ is isomorphic to @Void@. Therefore, such @m@ is isomorphic to @Const 'Void'@ as a @Functor@.
+
+Since every morphism @a -? m b@ is equal to @zero@,
+all other @PMonad@ laws trivially hold.
+
+-}
+
+{-
+
 [NOTE: Lifted and Traversable-based ]
 
 For a lifted @PMonad@ (@ppure, pjoin@ are defined by @Monad@),
