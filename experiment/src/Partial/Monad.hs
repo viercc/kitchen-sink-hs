@@ -270,9 +270,38 @@ The reason is, for such @PMonad@, @pmap = pmapDefault@ always hold, and as
   And this is true by the following computation.
 
     fmap join . traverse (fmap pure . f)
-    === fmap join . fmap (fmap pure) . traverse f
-    === fmap (join . fmap pure) . traverse f
-    === traverse f
+     = fmap join . fmap (fmap pure) . traverse f
+     = fmap (join . fmap pure) . traverse f
+     = traverse f
+
+This fact can be generalized to non-lifted @PMonad@ too if its @ppure, pbind@
+can be written as
+
+    ppure = arr pure'
+    pbind f = pjoin' . pmap f
+
+for some
+    
+    pure' :: forall a. a -> m a
+    pjoin' :: forall a. m (m a) -? m a
+
+.
+
+  (proof)
+
+    pmapDefault f
+     = pbind (ppure . f)
+     = pjoin' . pmap (arr pure' . f)
+     = pjoin' . Partial (traverse (fmap pure' . f))
+       { naturality of traverse }
+     = pjoin' . Partial (fmap (fmap pure') . traverse f)
+       { Partial (fmap g . h) = arr g . Partial h }
+     = pjoin' . arr (fmap pure') . Partial (traverse f)
+       { plain functor }
+     = pjoin' . pmap (arr pure') . pmap f
+     = pjoin' . pmap ppure . pmap f
+     = pbind ppure
+     = pmap f
 
 -}
 
@@ -292,14 +321,15 @@ suffice.
 
   because
 
-    pmap f . pbind g
+    pmap f . pbind g . pmap h
       {definition of pbind}
-    = pmap f . arr join . pmap g
+    = pmap f . arr join . pmap g . pmap h
+    = pmap f . arr join . pmap (g . h)
       {use (A)}
-    = pjoin . pmap (pmap f) . pmap g
-    = pjoin . pmap (pmap f . pmap g)
+    = pjoin . pmap (pmap f) . pmap (g . h)
+    = pjoin . pmap (pmap f . pmap (g . h))
       {definition of pbind}
-    = pbind (pmap f . g)
+    = pbind (pmap f . g . h)
 
 * To avoid wrapping/unwrapping of @Partial@ clutters the proof,
   define the unwrapped versions as below:
