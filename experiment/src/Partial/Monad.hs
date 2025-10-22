@@ -148,8 +148,8 @@ instance Absurd a => PMonad (Const a) where
 
 [NOTE: Lifted PMonad ]
 
-Let's call such @PMonad@ a /lifted/ @PMonad@ whenever
-@ppure, pbind@ is based off of @Monad@ like above instances:
+Let's call a @PMonad m@ /lifted/ if @ppure, pbind@ is
+defined as the following using @Monad m@ instance
 
 - @ppure = arr pure@
 - @pbind k = arr join . pmap k@
