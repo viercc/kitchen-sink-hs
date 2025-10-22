@@ -70,7 +70,7 @@ import Data.Functor.Const (Const)
 -- 
 -- Conversely, with the first three laws (left and right unit law, associativity) plus
 -- @pmap === pmapDefault@ shows /naturality of ppure/ and /naturality of pbind/.
--- Therefore, one may instead show the first three laws + @pmap === pmapDefault@ to
+-- Therefore, one may instead show the first three laws and @pmap === pmapDefault@ to
 -- prove their @PMonad@ instance is valid.
 
 {-
@@ -179,16 +179,16 @@ instance Absurd a => PMonad (Const a) where
 
 [NOTE: Lifted PMonad ]
 
-Whenever @ppure, pbind@ is based off of @Monad@ like above instances,
-i.e.
+Let's call such @PMonad@ a /lifted/ @PMonad@ whenever
+@ppure, pbind@ is based off of @Monad@ like above instances:
 
 - @ppure = arr pure@
 - @pbind k = arr join . pmap k@
 
-Let's call such @PMonad@ a \"lifted\" PMonad.
+.
 
 For a lifted PMonad, the first three laws follows from the two naturality laws.
-For example, associativity can be shown as the following.
+For example, /associativity/ can be shown as the following.
 
   pbind f . pbind g
    = arr join . pmap f . pbind g
@@ -216,13 +216,13 @@ Left and right unit laws can be done similarly.
 By parametricity, @(ppure :: forall a. a -? m a)@
 does not change the shape of the returned value
 @(runPartial ppure x :: Maybe (m a))@ depending on which type @a@
-is used. Therefore, @ppure@ is either one of the following two:
+is used. Therefore, @ppure@ is either one of the following two cases:
 
 - @ppure = zero  = Partial (const Nothing)@
 - There exists @s :: forall a. a -> m a@ such that
   @ppure = arr s = Partial (Just . s)@.
 
-In the lifted case, @ppure@ is the latter with @s = pure@.
+In the lifted PMonad, @ppure@ is the latter with @s = pure@.
 
 The only @PMonad m@ with the former case @ppure = zero@ is
 the one which is isomorphic to empty functor @Const 'Void'@ (or 'V1').
@@ -252,7 +252,7 @@ all other @PMonad@ laws trivially hold.
 [NOTE: Lifted and Traversable-based ]
 
 For a lifted @PMonad@ (@ppure, pjoin@ are defined by @Monad@),
-the previous note explains naturality conditions imply other three laws.
+the previous note explains naturality conditions imply the other three laws.
 
 If its @PFunctor@ instance is defined as
 @pmap f = smash f = Partial (traverse f)@, the converse also hold.
@@ -260,18 +260,20 @@ For such @PMonad@, the first three laws (left and right unit, associativity) imp
 two naturality laws.
 
 The reason is, for such @PMonad@, @pmap = pmapDefault@ always hold, and as
-[Note: pmapDefault] explains, (pmap = pmapDefault && the first three) implies naturality laws.
+[Note: pmapDefault] explains, (pmap = pmapDefault && the first three) imply naturality laws.
 
   (proof)
   @pmap = pmapDefault@ can be written as an unwrapped version:
 
     traverse f = fmap join . traverse (fmap pure . f)
 
-  And this is true by the following computation.
+  And this is just true by the following computation.
 
     fmap join . traverse (fmap pure . f)
+       { naturality of traverse }
      = fmap join . fmap (fmap pure) . traverse f
      = fmap (join . fmap pure) . traverse f
+       { join . fmap pure = id}
      = traverse f
 
 This fact can be generalized to non-lifted @PMonad@ too if its @ppure, pbind@
@@ -311,7 +313,7 @@ instance PMonad NonEmpty where
 
 {-
 
-This is a "lifted" case, thus showing only naturality
+This is a lifted PMonad, thus showing only naturality
 suffice.
 
 * Instead of directly prove naturality of pbind,
