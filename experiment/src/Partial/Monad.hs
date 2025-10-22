@@ -4,9 +4,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 module Partial.Monad(
-  PMonad(..), pjoin, pmapDefault,
-
-  Pt(..)
+  PMonad(..), pjoin, pmapDefault
 ) where
 
 import Prelude hiding (id, (.))
@@ -15,12 +13,11 @@ import Control.Category (Category(..))
 import Partial
 import Partial.Functor
 import Control.Arrow (Arrow(..))
-import Control.Monad (join, ap)
+import Control.Monad (join)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Functor.Product (Product (..))
 import Data.Functor.These (These1 (..))
 import Data.These
-import Data.Coerce (coerce)
 import Data.Boring (Absurd)
 import Data.Functor.Const (Const)
 
@@ -127,50 +124,22 @@ pjoin = pbind id
 pmapDefault :: PMonad m => (a -? b) -> (m a -? m b)
 pmapDefault f = pbind (ppure . f)
 
--- | @PMonad m@ induces @Monad@ structure on @Maybe (m _)@.
-newtype Pt m a = Pt { unPt :: Maybe (m a) }
-  deriving (Show, Eq, Functor)
-
-instance PMonad m => Applicative (Pt m) where
-  pure = kleisliPt ppure
-  (<*>) = ap
-
-instance PMonad m => Monad (Pt m) where
-  Pt ma >>= k = Pt $ ma >>= runPartial (pbind (unkleisliPt k))
-
-kleisliPt :: (a -? m b) -> a -> Pt m b
-kleisliPt = coerce
-
-unkleisliPt :: (a -> Pt m b) -> (a -? m b)
-unkleisliPt = coerce
-
 instance PMonad Maybe where
   ppure = arr pure
   pbind k = arr join . pmap k
 
--- >>> mxs = [Pt Nothing, Pt (Just Nothing), Pt (Just (Just 'x'))] :: [Pt Maybe Char]
--- >>> [mx >>= \x -> my >>= \y -> pure [x,y] | mx <- mxs, my <- mxs ]
--- [Pt {unPt = Nothing},      Pt {unPt = Nothing},      Pt {unPt = Nothing},
---  Pt {unPt = Just Nothing}, Pt {unPt = Just Nothing}, Pt {unPt = Just Nothing},
---  Pt {unPt = Nothing},      Pt {unPt = Just Nothing}, Pt {unPt = Just (Just "xx")}
--- ]
-
--- | @Pt (Either a) ~ Either (Maybe a)@
 instance PMonad (Either a) where
   ppure = arr pure
   pbind k = arr join . pmap k
 
--- | @Pt ((,) a) ~ WriterT a Maybe@
 instance Monoid a => PMonad ((,) a) where
   ppure = arr pure
   pbind k = arr join . pmap k
 
--- | @Pt (These a) ~ MaybeT (Writer (Maybe a))@
 instance Semigroup a => PMonad (These a) where
   ppure = arr pure
   pbind k = arr join . pmap k
 
--- | @Pt (Const Void) ~ Proxy@
 instance Absurd a => PMonad (Const a) where
   ppure = zero
   pbind _ = zero

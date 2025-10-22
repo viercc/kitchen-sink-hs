@@ -45,6 +45,7 @@ library
     Partial,
     Partial.Functor,
     Partial.Monad,
+    Partial.Monad.Pt,
     Partial.Monoidal,
     Partial.Poifree,
 
