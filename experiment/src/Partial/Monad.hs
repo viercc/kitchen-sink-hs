@@ -66,7 +66,7 @@ import Data.Functor.Const (Const)
 -- @
 -- 
 -- Conversely, with the first three laws (left and right unit law, associativity) plus
--- @pmap === pmapDefault@ shows /naturality of ppure/ and /naturality of pbind/.
+-- @pmap === pmapDefault@ show /naturality of ppure/ and /naturality of pbind/.
 -- Therefore, one may instead show the first three laws and @pmap === pmapDefault@ to
 -- prove their @PMonad@ instance is valid.
 
@@ -91,7 +91,7 @@ import Data.Functor.Const (Const)
 >   === pbind (ppure . f)
 
 Conversely, from left and right unit laws, associativity, and default @pmap@,
-two naturality condition follows.
+two naturality conditions follow.
 
 > (proof:ppure-naturality)
 > pmap f . ppure
@@ -156,7 +156,7 @@ defined as the following using @Monad m@ instance
 
 .
 
-For a lifted PMonad, the first three laws follows from the two naturality laws.
+For a lifted PMonad, the two naturality laws imply the first three laws.
 For example, /associativity/ can be shown as the following.
 
   pbind f . pbind g
@@ -169,7 +169,7 @@ For example, /associativity/ can be shown as the following.
    = arr (join . fmap join) . pmap (pmap f . g)
    = arr join . arr (fmap join) . pmap (pmap f . g)
       {plain functor}
-   = arr join . pmap (arr join) . pmap (pmap f) . pmap g
+   = arr join . pmap (arr join) . pmap (pmap f . g)
    = arr join . pmap (arr join . pmap f . g)
    = arr join . pmap (pbind f . g)
    = pbind (pbind f . g)
@@ -193,11 +193,11 @@ is used. Therefore, @ppure@ is either one of the following two cases:
 
 In the lifted PMonad, @ppure@ is the latter with @s = pure@.
 
-The only @PMonad m@ with the former case @ppure = zero@ is
+The only @PMonad m@ with the former case is
 the one which is isomorphic to empty functor @Const 'Void'@ (or 'V1').
 
-The crucial point is given @ppure = zero@ and /left unit/ law,
-any @f :: a -> m b@ must be equal to @zero@ for any type @a,b@.
+The crucial point is: given @ppure = zero@ and /left unit/ law,
+any @f :: a -> m b@ must be equal to @zero@ regardless of type @a,b@.
 
   (proof)
     f
@@ -271,7 +271,7 @@ for some
        { plain functor }
      = pjoin' . pmap (arr pure') . pmap f
      = pjoin' . pmap ppure . pmap f
-     = pbind ppure
+     = pbind ppure . f
      = pmap f
 
 -}
