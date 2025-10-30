@@ -3,6 +3,9 @@ module Math.BalanceFreePartition where
 import Control.Monad (guard)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Ord (comparing, Down (..))
+import Data.List (sortBy)
+import qualified Data.Set as Set
 
 
 ---- Balance-free partitions
@@ -16,16 +19,25 @@ import qualified Data.IntSet as IntSet
     としたもの、すなわち `concat pparts` が `p` と順序を除いて一致するものであって、 `map sum pparts == q` を満たすような `pparts` が存在すること。
     （注:一般に与えられた分割の組`(p,q)`に対して`p`が`q`の細分であるか(==`pparts`が存在するか)を判定する問題は難しいらしい。）
 
-(balance-free分割): `n` の分割 `p` がbalance-freeであるとは、以下の2条件を満たすこと。
+    `p` が `q` の細分であることを `p ≼ q`, `p ≼ q`かつ`p /= q`であることを`p ≺ q`と表記する。
 
-    * `p`が重複する要素をもたない i.e. `a_0 > a_1 > ...`
-    * `p`を分割とするような任意の`q`で`p`以外のもの(`p`のいくつかの部分を足し合わせて作った粗い分割`q`)はいずれもbalance-free
+(balance-free分割): `n` の分割 `p` がbalance-freeであるとは、以下の同値な条件いずれか(したがって全て)を満たすこと。
 
-    同値な条件として、　`p`がbalance-free ⇔
+    1. 以下の2条件を両方満たす
 
-    * `p`の空でない部分（重複）集合であって互いに素な組`(pA,pB)`をどのようにとっても、それらの和は異なる: `sum pA /= sum pB`.
+       * `p`が重複する要素をもたない i.e. `a_0 > a_1 > ...`
+       * 任意の `q`に対して、 `p ≺ q`ならば`q`はbalance-free
 
+    2. `p`の空でない部分（重複）集合であって互いに素な組`(pA,pB)`をどのようにとっても、それらの和は異なる: `sum pA /= sum pB`.
+
+    3. `p`の空でない部分（重複）集合であって互いに異なる組`pA /= pB`をどのようにとっても、それらの和は異なる: `sum pA /= sum pB`.
 -}
+
+-- | Balance-free partitionは重複をもたないので
+--   単なる `IntSet` で表される
+
+newtype BF = BF IntSet
+  deriving (Show, Eq, Ord)
 
 {-
 
@@ -60,41 +72,26 @@ updateDelta a delta_p
 最終結果でも `0 ∈ delta (a0 : a1 : ... : p')`なので、効率的に"枝刈り"が可能です。
 -}
 
-bfpartitions :: Int -> [[Int]]
-bfpartitions n0 = go n0 n0 IntSet.empty
-  where
-    -- go i n p delta
-    --     i: maximum part size
-    --     n: remaining sum
-    --     delta_p: partial computation result of `delta p`
-    go :: Int -> Int -> IntSet -> [[Int]]
-    go i n delta_p
-      | n < 0 = [] -- no negative sums
-      | 0 `IntSet.member` delta_p = []
-      | n == 0 = [[]]
-      | i <= 0 = []
-      | i > n = go n n delta_p
-      | otherwise =
-          [ i : p' | p' <- go i (n - i) (updateDelta i delta_p) ]
-            ++ go (i - 1) n delta_p
+bfpartitions :: Int -> [BF]
+bfpartitions = map fst . bfpartitionsWithDelta
 
-bfpartitionsWithDelta :: Int -> [([Int], IntSet)]
-bfpartitionsWithDelta n0 = go n0 n0 [] IntSet.empty
+bfpartitionsWithDelta :: Int -> [(BF, IntSet)]
+bfpartitionsWithDelta n0 = go n0 n0 IntSet.empty IntSet.empty
   where
-    -- go i n p delta
+    -- go i n p delta_p
     --     i: maximum part size
     --     n: remaining sum
     --     p: already decided partitions
     --     delta_p: `delta p` updated in sync with `p`
-    go :: Int -> Int -> [Int] -> IntSet -> [([Int], IntSet)]
+    go :: Int -> Int -> IntSet -> IntSet -> [(BF, IntSet)]
     go i n p delta_p
       | n < 0 = [] -- no negative sums
       | 0 `IntSet.member` delta_p = []
-      | n == 0 = [(reverse p, delta_p)]
+      | n == 0 = [(BF p, delta_p)]
       | i <= 0 = []
       | i > n = go n n p delta_p
       | otherwise =
-          go i (n - i) (i : p) (updateDelta i delta_p)
+          go i (n - i) (IntSet.insert i p) (updateDelta i delta_p)
             ++ go (i - 1) n p delta_p
 {-
 
@@ -187,20 +184,91 @@ balance-freeな分割 `p' = [2*k] ++ q` に対して、`[k] ++ q`がsemi-balance
 
 -}
 
-sbfpartitions :: Int -> [[Int]]
+-- | semi-balance-free partitionはそれ自体balance-free (`SmallStep p`)か、
+--   あるいは balance-free に同じ値 `k` のペアを一つ追加したもの (`BigStep k p`)
+data SemiBF =
+    SmallStep !BF
+  | BigStep !Int !BF
+  deriving (Show, Eq, Ord)
+
+sbfpartitions :: Int -> [SemiBF]
 sbfpartitions n0 = do
   p' <- bfpartitions n0
-  [p'] ++ derive p'
+  [SmallStep p'] ++ derive p'
   where
-    derive :: [Int] -> [[Int]]
-    derive p' = do
-      k <- [ a `div` 2 | a <- p', even a ]
-      let qSet = IntSet.delete (2 * k) p'Set
-          q = IntSet.toDescList qSet
-          delta_q = delta q
-      guard $ k `IntSet.member` qSet || k `IntSet.notMember` delta_q
-      let qHi = takeWhile (> k) q
-          qLo = dropWhile (> k) q
-      return $ qHi ++ [k,k] ++ qLo
-      where
-        p'Set = IntSet.fromList p'
+    derive :: BF -> [SemiBF]
+    derive (BF p') = do
+      k <- [ a `div` 2 | a <- IntSet.toDescList p', even a ]
+      let q = IntSet.delete (2 * k) p'
+          delta_q = delta (IntSet.toList q)
+      guard $ k `IntSet.member` q || k `IntSet.notMember` delta_q
+      return $ BigStep k (BF q)
+
+---------
+
+lengthSemiBF :: SemiBF -> Int
+lengthSemiBF (SmallStep p) = lengthBF p
+lengthSemiBF (BigStep _ p) = 2 + lengthBF p
+
+sumSemiBF :: SemiBF -> Int
+sumSemiBF (SmallStep p) = sumBF p
+sumSemiBF (BigStep k p) = 2 * k + sumBF p
+
+lengthBF :: BF -> Int
+lengthBF (BF p) = IntSet.size p
+
+sumBF :: BF -> Int
+sumBF (BF p) = sum (IntSet.toList p)
+
+-----------
+
+minimalBFPartitions :: Int -> [BF]
+minimalBFPartitions = loop Set.empty . sortBy (comparing (Down . lengthBF)) . bfpartitions
+  where
+    loop :: Set.Set BF -> [BF] -> [BF]
+    loop _       [] = []
+    loop parents (p : rest)
+      | p `Set.member` parents = loop (Set.union (parentsOfBF p) parents) rest
+      | otherwise              = p : loop (Set.union (parentsOfBF p) parents) rest
+
+parentsOfBF :: BF -> Set.Set BF
+parentsOfBF (BF p) = Set.fromList $ do
+  a <- IntSet.toAscList p
+  b <- IntSet.toAscList (IntSet.dropWhileAntitone (<= a) p)
+  -- Since p is balance-free, (a + b) ∉ p
+  -- Also balance-free is a property preserved by merger of its parts
+  pure $ BF $ IntSet.insert (a + b) $ IntSet.delete a $ IntSet.delete b p
+
+minimalSemiBFPartitions :: Int -> [SemiBF]
+minimalSemiBFPartitions = loop Set.empty . sortBy (comparing (Down . lengthSemiBF)) . sbfpartitions
+  where
+    loop :: Set.Set SemiBF -> [SemiBF] -> [SemiBF]
+    loop _       [] = []
+    loop parents (p : rest)
+      | p `Set.member` parents = loop (Set.union (parentsOfSemiBF p) parents) rest
+      | otherwise              = p : loop (Set.union (parentsOfSemiBF p) parents) rest
+
+parentsOfSemiBF :: SemiBF -> Set.Set SemiBF
+parentsOfSemiBF (SmallStep p) = Set.mapMonotonic SmallStep (parentsOfBF p)
+parentsOfSemiBF (BigStep k (BF p)) =
+    let p' = BF $ IntSet.insert (2*k) p
+    in  Set.insert (SmallStep p') $ Set.mapMonotonic (BigStep k) (parentsOfBF (BF p))
+{-
+
+ある `SemiBF` に対して、
+
+* `p`がbalance-free のときは`BF`と同じ。
+
+* `p = BigStep k p₀ = [k,k] ++ p₀` のとき、`p`をcoverする`q`は次のどちらか。
+
+  * `q = [2*k] ++ p₀`
+  * `p₀`をcoverする`q₀`に対して`q = [k,k] ++ q₀`。
+
+    * `l /= k` に対して `q = [l,l] + q'` とはならない。
+      実際、一方の`l`が`p`に存在する2つの部分の合併`a0+a1, [a0,a1] ⊂ p`であることはない。
+      もしそうであれば、`l = a0 + a1`は`p`がsemi-balance-freeであるための条件に反している。
+      しかし、2個の`l`が`p`にもともと含まれていることもできない。semi-balance-freeは
+      同じ値の部分のペアを高々1つしかもてず、`k`のペアがすでに存在する。
+      よってそのような`l`は存在しない。
+
+-}
