@@ -28,6 +28,7 @@ library
     Math.DyckWord,
     Math.BinaryTreeExpr,
     Math.BalanceFreePartition,
+    Math.AAtomicPartition,
 
     Hopf,
 

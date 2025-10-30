@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE InstanceSigs #-}
 module Math.BalanceFreePartition where
 
 import Control.Monad (guard)
@@ -6,7 +8,8 @@ import qualified Data.IntSet as IntSet
 import Data.Ord (comparing, Down (..))
 import Data.List (sortBy)
 import qualified Data.Set as Set
-
+import GHC.IsList (IsList(..))
+import qualified Data.Map as Map
 
 ---- Balance-free partitions
 
@@ -37,7 +40,22 @@ import qualified Data.Set as Set
 --   単なる `IntSet` で表される
 
 newtype BF = BF IntSet
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord)
+
+instance IsList BF where
+  type Item BF = Int
+
+  fromList :: [Int] -> BF
+  fromList p
+    | any (<= 0) p = error "Item of BF must be a positive integer"
+    | 0 `IntSet.member` delta p = error $ "Balance-free constraint is broken: " ++ show p
+    | otherwise = BF $ IntSet.fromList p
+ 
+  toList :: BF -> [Int]
+  toList (BF p) = IntSet.toDescList p 
+
+instance Show BF where
+  showsPrec prec bf = showsPrec prec (toList bf)
 
 {-
 
@@ -206,6 +224,10 @@ sbfpartitions n0 = do
 
 ---------
 
+prettySemiBF :: SemiBF -> String
+prettySemiBF (SmallStep p) = show p
+prettySemiBF (BigStep k p) = show [k,k] ++ "+" ++ show p
+
 lengthSemiBF :: SemiBF -> Int
 lengthSemiBF (SmallStep p) = lengthBF p
 lengthSemiBF (BigStep _ p) = 2 + lengthBF p
@@ -272,3 +294,59 @@ parentsOfSemiBF (BigStep k (BF p)) =
       よってそのような`l`は存在しない。
 
 -}
+
+-------------------
+
+bfpartitionsDot :: Int -> String
+bfpartitionsDot n0 = unlines doc
+  where
+    allPartitions = zip [0 :: Int ..] (bfpartitions n0)
+    revIndex = Map.fromList [ (p,i) | (i,p) <- allPartitions]
+    rankGroups =
+      map Set.toList $
+      Map.elems $
+      Map.fromListWith Set.union
+        [ (lengthBF p, Set.singleton i) | (i,p) <- allPartitions ]
+
+    nodeName i = "v" ++ show i
+    indent = map ("  " ++)
+    docNode (i,p) = nodeName i ++ " [label=\"" ++ show p ++ "\"]"
+    docEdges (i,p) = "{" ++ unwords (nodeName <$> parentIds) ++ "} -> " ++ nodeName i
+      where parents = Set.toList $ parentsOfBF p
+            parentIds = [ j | q <- parents, Just j <- [Map.lookup q revIndex] ]
+    docRanks sameRankIds = "subgraph { rank=same; " ++ unwords [ nodeName i ++ ";" | i <- sameRankIds ] ++ "}"
+    doc =
+      [ "digraph BFPartitionsHasse {" ] ++
+      indent [ "node [shape=box]" ] ++
+      indent [ "edge [arrowhead=none]" ] ++
+      indent (docNode <$> allPartitions) ++
+      indent (docEdges <$> allPartitions) ++
+      indent (docRanks <$> rankGroups) ++
+      [ "}" ]
+
+sbfpartitionsDot :: Int -> String
+sbfpartitionsDot n0 = unlines doc
+  where
+    allPartitions = zip [0 :: Int ..] (sbfpartitions n0)
+    revIndex = Map.fromList [ (p,i) | (i,p) <- allPartitions]
+    rankGroups =
+      map Set.toList $
+      Map.elems $
+      Map.fromListWith Set.union
+        [ (lengthSemiBF p, Set.singleton i) | (i,p) <- allPartitions ]
+
+    nodeName i = "v" ++ show i
+    indent = map ("  " ++)
+    docNode (i,p) = nodeName i ++ " [label=\"" ++ prettySemiBF p ++ "\"]"
+    docEdges (i,p) = "{" ++ unwords (nodeName <$> parentIds) ++ "} -> " ++ nodeName i
+      where parents = Set.toList $ parentsOfSemiBF p
+            parentIds = [ j | q <- parents, Just j <- [Map.lookup q revIndex] ]
+    docRanks sameRankIds = "subgraph { rank=same; " ++ unwords [ nodeName i ++ ";" | i <- sameRankIds ] ++ "}"
+    doc =
+      [ "digraph SemiBFPartitionsHasse {" ] ++
+      indent [ "node [shape=box; color=white]" ] ++
+      indent [ "edge [arrowhead=none]" ] ++
+      indent (docNode <$> allPartitions) ++
+      indent (docEdges <$> allPartitions) ++
+      indent (docRanks <$> rankGroups) ++
+      [ "}" ]
