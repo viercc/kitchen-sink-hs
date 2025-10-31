@@ -1,4 +1,4 @@
-module Math.AAtomicPartition(
+module Math.IntegerPartition.AAtomic(
   -- * Main functions
   isAAtomic,
   aAtomicPartitions,
@@ -9,18 +9,22 @@ module Math.AAtomicPartition(
   SubsetSums(),
   sums2,
   singletonSum,
+
+  -- * Reexport
+  Partition
 ) where
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Math.BalanceFreePartition
 import Control.Monad (guard)
 
-{-
-(分割の定義):
-  非負整数 n の分割とは、正整数の降順リスト p = [a0, a1, ..., ak],
-  sum p == n を満たすもの。
+import Math.IntegerPartition (Partition)
+import qualified Math.IntegerPartition as P
+import Math.IntegerPartition.BalanceFree
+    ( SBF(..), BF(..), delta, updateDelta )
+import GHC.IsList (IsList(..))
 
+{-
 (A-atomic な分割):
   あらかじめ 1 より大きい整数からなる集合 A ⊂ ℕ を固定する。
   分割 p が A-atomic であるとは、
@@ -47,11 +51,11 @@ import Control.Monad (guard)
 --
 --   ただし素直にやると指数的なので、
 --   実際の列挙本体ではよりインクリメンタルな枝刈りを使う。
-isAAtomic :: IntSet   -- ^ A
-          -> [Int]    -- ^ partition in descending order
+isAAtomic :: IntSet    -- ^ A
+          -> Partition -- ^ partition
           -> Bool
 isAAtomic atoms parts =
-    IntSet.disjoint (subsetSumsGE2 parts) atoms
+    IntSet.disjoint (subsetSumsGE2 (toList parts)) atoms
 
 -- | Set of sums of all submultisets of a multiset of Ints
 data SubsetSums = SubsetSums {
@@ -96,15 +100,14 @@ subsetSumsGE2 = sums2 . foldl' (<>) mempty . map singletonSum
 --      n0    : 合計 n0
 --
 --   戻り値:
---      A-atomic な分割を (降順リストとして) 全部返す。
+--      A-atomic な分割を全部返す。
 --
 --   方針は balance-free の列挙と似ていて、
 --   「現在の部分的な分割 p」「p の部分多重集合和に関する状態」を持って
 --   深さ優先で降順に延長していく。ただしここでは重複可。
-aAtomicPartitions :: IntSet -> Int -> [[Int]]
+aAtomicPartitions :: IntSet -> Int -> [Partition]
 aAtomicPartitions atoms n0 =
-    map reverse $  -- 最終的には降順にしたいので reverse せず最初から降順で作ってもOK
-    go n0 n0 [] mempty
+    go n0 n0 mempty mempty
   where
     -- go i n parts sums
     --    i     : いま選べるパーツの最大値 (降順制約のための上限)
@@ -119,7 +122,7 @@ aAtomicPartitions atoms n0 =
     -- 終了条件:
     --   n == 0 なら parts が完成 (A-atomic 性は sums2∩A=∅ によって保証済)
     --
-    go :: Int -> Int -> [Int] -> SubsetSums -> [[Int]]
+    go :: Int -> Int -> Partition -> SubsetSums -> [Partition]
     go i n parts sums
       | n < 0 = []
       | not (IntSet.disjoint (sums2 sums) atoms) = []
@@ -128,7 +131,7 @@ aAtomicPartitions atoms n0 =
       | i > n  = go n n parts sums
       | otherwise =
           let sums' = singletonSum i <> sums
-          in  go i (n - i) (i : parts) sums' ++ go (i - 1) n parts sums
+          in  go i (n - i) (P.singleton i <> parts) sums' ++ go (i - 1) n parts sums
 
 {-
 使い方イメージ:

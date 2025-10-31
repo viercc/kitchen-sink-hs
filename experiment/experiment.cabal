@@ -27,8 +27,9 @@ library
     Math.QSqrt2,
     Math.DyckWord,
     Math.BinaryTreeExpr,
-    Math.BalanceFreePartition,
-    Math.AAtomicPartition,
+    Math.IntegerPartition.BalanceFree,
+    Math.IntegerPartition.AAtomic,
+    Math.IntegerPartition,
 
     Hopf,
     HasseDiagram,

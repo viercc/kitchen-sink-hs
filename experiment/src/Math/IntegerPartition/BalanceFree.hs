@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
-module Math.BalanceFreePartition(
+module Math.IntegerPartition.BalanceFree(
   -- * Main type and functions
   -- ** Balance-free
   BF(..),
@@ -319,8 +319,12 @@ parentsOfSBF (BigStep k (BF p)) =
 
 -------------------
 
+-- | Outputs a Hasse diagram (of refinement poset) for balance-free partitions of @n@,
+--   expressed in DOT language (refer Graphviz documentation for DOT)
 bfpartitionsDot :: Int -> String
 bfpartitionsDot n0 = dotHasse (bfpartitions n0) show (Set.toList . parentsOfBF)
 
+-- | Outputs a Hasse diagram (of refinement poset) for semi-balance-free partitions of @n@,
+--   expressed in DOT language (refer Graphviz documentation for DOT)
 sbfpartitionsDot :: Int -> String
 sbfpartitionsDot n0 = dotHasse (sbfpartitions n0) prettySBF (Set.toList . parentsOfSBF)
