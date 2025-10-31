@@ -1,6 +1,27 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
-module Math.BalanceFreePartition where
+module Math.BalanceFreePartition(
+  -- * Main type and functions
+  -- ** Balance-free
+  BF(..),
+  sumBF, lengthBF,
+  bfpartitions,
+  minimalBFPartitions,
+  -- ** Semi-balance-free
+  SBF(..),
+  sumSBF, lengthSBF, prettySBF,
+  sbfpartitions,
+  minimalSBFPartitions,
+
+  -- * Implementation details
+  delta,
+  updateDelta,
+
+  -- * Visualization
+  bfpartitionsDot,
+  sbfpartitionsDot,
+
+) where
 
 import Control.Monad (guard)
 import Data.IntSet (IntSet)
@@ -9,7 +30,8 @@ import Data.Ord (comparing, Down (..))
 import Data.List (sortBy)
 import qualified Data.Set as Set
 import GHC.IsList (IsList(..))
-import qualified Data.Map as Map
+
+import HasseDiagram (dotHasse)
 
 ---- Balance-free partitions
 
@@ -204,17 +226,17 @@ balance-freeな分割 `p' = [2*k] ++ q` に対して、`[k] ++ q`がsemi-balance
 
 -- | semi-balance-free partitionはそれ自体balance-free (`SmallStep p`)か、
 --   あるいは balance-free に同じ値 `k` のペアを一つ追加したもの (`BigStep k p`)
-data SemiBF =
+data SBF =
     SmallStep !BF
   | BigStep !Int !BF
   deriving (Show, Eq, Ord)
 
-sbfpartitions :: Int -> [SemiBF]
+sbfpartitions :: Int -> [SBF]
 sbfpartitions n0 = do
   p' <- bfpartitions n0
   [SmallStep p'] ++ derive p'
   where
-    derive :: BF -> [SemiBF]
+    derive :: BF -> [SBF]
     derive (BF p') = do
       k <- [ a `div` 2 | a <- IntSet.toDescList p', even a ]
       let q = IntSet.delete (2 * k) p'
@@ -224,17 +246,17 @@ sbfpartitions n0 = do
 
 ---------
 
-prettySemiBF :: SemiBF -> String
-prettySemiBF (SmallStep p) = show p
-prettySemiBF (BigStep k p) = show [k,k] ++ "+" ++ show p
+prettySBF :: SBF -> String
+prettySBF (SmallStep p) = show p
+prettySBF (BigStep k p) = show [k,k] ++ "+" ++ show p
 
-lengthSemiBF :: SemiBF -> Int
-lengthSemiBF (SmallStep p) = lengthBF p
-lengthSemiBF (BigStep _ p) = 2 + lengthBF p
+lengthSBF :: SBF -> Int
+lengthSBF (SmallStep p) = lengthBF p
+lengthSBF (BigStep _ p) = 2 + lengthBF p
 
-sumSemiBF :: SemiBF -> Int
-sumSemiBF (SmallStep p) = sumBF p
-sumSemiBF (BigStep k p) = 2 * k + sumBF p
+sumSBF :: SBF -> Int
+sumSBF (SmallStep p) = sumBF p
+sumSBF (BigStep k p) = 2 * k + sumBF p
 
 lengthBF :: BF -> Int
 lengthBF (BF p) = IntSet.size p
@@ -261,23 +283,23 @@ parentsOfBF (BF p) = Set.fromList $ do
   -- Also balance-free is a property preserved by merger of its parts
   pure $ BF $ IntSet.insert (a + b) $ IntSet.delete a $ IntSet.delete b p
 
-minimalSemiBFPartitions :: Int -> [SemiBF]
-minimalSemiBFPartitions = loop Set.empty . sortBy (comparing (Down . lengthSemiBF)) . sbfpartitions
+minimalSBFPartitions :: Int -> [SBF]
+minimalSBFPartitions = loop Set.empty . sortBy (comparing (Down . lengthSBF)) . sbfpartitions
   where
-    loop :: Set.Set SemiBF -> [SemiBF] -> [SemiBF]
+    loop :: Set.Set SBF -> [SBF] -> [SBF]
     loop _       [] = []
     loop parents (p : rest)
-      | p `Set.member` parents = loop (Set.union (parentsOfSemiBF p) parents) rest
-      | otherwise              = p : loop (Set.union (parentsOfSemiBF p) parents) rest
+      | p `Set.member` parents = loop (Set.union (parentsOfSBF p) parents) rest
+      | otherwise              = p : loop (Set.union (parentsOfSBF p) parents) rest
 
-parentsOfSemiBF :: SemiBF -> Set.Set SemiBF
-parentsOfSemiBF (SmallStep p) = Set.mapMonotonic SmallStep (parentsOfBF p)
-parentsOfSemiBF (BigStep k (BF p)) =
+parentsOfSBF :: SBF -> Set.Set SBF
+parentsOfSBF (SmallStep p) = Set.mapMonotonic SmallStep (parentsOfBF p)
+parentsOfSBF (BigStep k (BF p)) =
     let p' = BF $ IntSet.insert (2*k) p
     in  Set.insert (SmallStep p') $ Set.mapMonotonic (BigStep k) (parentsOfBF (BF p))
 {-
 
-ある `SemiBF` に対して、
+ある `SBF` に対して、
 
 * `p`がbalance-free のときは`BF`と同じ。
 
@@ -298,55 +320,7 @@ parentsOfSemiBF (BigStep k (BF p)) =
 -------------------
 
 bfpartitionsDot :: Int -> String
-bfpartitionsDot n0 = unlines doc
-  where
-    allPartitions = zip [0 :: Int ..] (bfpartitions n0)
-    revIndex = Map.fromList [ (p,i) | (i,p) <- allPartitions]
-    rankGroups =
-      map Set.toList $
-      Map.elems $
-      Map.fromListWith Set.union
-        [ (lengthBF p, Set.singleton i) | (i,p) <- allPartitions ]
-
-    nodeName i = "v" ++ show i
-    indent = map ("  " ++)
-    docNode (i,p) = nodeName i ++ " [label=\"" ++ show p ++ "\"]"
-    docEdges (i,p) = "{" ++ unwords (nodeName <$> parentIds) ++ "} -> " ++ nodeName i
-      where parents = Set.toList $ parentsOfBF p
-            parentIds = [ j | q <- parents, Just j <- [Map.lookup q revIndex] ]
-    docRanks sameRankIds = "subgraph { rank=same; " ++ unwords [ nodeName i ++ ";" | i <- sameRankIds ] ++ "}"
-    doc =
-      [ "digraph BFPartitionsHasse {" ] ++
-      indent [ "node [shape=box]" ] ++
-      indent [ "edge [arrowhead=none]" ] ++
-      indent (docNode <$> allPartitions) ++
-      indent (docEdges <$> allPartitions) ++
-      indent (docRanks <$> rankGroups) ++
-      [ "}" ]
+bfpartitionsDot n0 = dotHasse (bfpartitions n0) show (Set.toList . parentsOfBF)
 
 sbfpartitionsDot :: Int -> String
-sbfpartitionsDot n0 = unlines doc
-  where
-    allPartitions = zip [0 :: Int ..] (sbfpartitions n0)
-    revIndex = Map.fromList [ (p,i) | (i,p) <- allPartitions]
-    rankGroups =
-      map Set.toList $
-      Map.elems $
-      Map.fromListWith Set.union
-        [ (lengthSemiBF p, Set.singleton i) | (i,p) <- allPartitions ]
-
-    nodeName i = "v" ++ show i
-    indent = map ("  " ++)
-    docNode (i,p) = nodeName i ++ " [label=\"" ++ prettySemiBF p ++ "\"]"
-    docEdges (i,p) = "{" ++ unwords (nodeName <$> parentIds) ++ "} -> " ++ nodeName i
-      where parents = Set.toList $ parentsOfSemiBF p
-            parentIds = [ j | q <- parents, Just j <- [Map.lookup q revIndex] ]
-    docRanks sameRankIds = "subgraph { rank=same; " ++ unwords [ nodeName i ++ ";" | i <- sameRankIds ] ++ "}"
-    doc =
-      [ "digraph SemiBFPartitionsHasse {" ] ++
-      indent [ "node [shape=box; color=white]" ] ++
-      indent [ "edge [arrowhead=none]" ] ++
-      indent (docNode <$> allPartitions) ++
-      indent (docEdges <$> allPartitions) ++
-      indent (docRanks <$> rankGroups) ++
-      [ "}" ]
+sbfpartitionsDot n0 = dotHasse (sbfpartitions n0) prettySBF (Set.toList . parentsOfSBF)

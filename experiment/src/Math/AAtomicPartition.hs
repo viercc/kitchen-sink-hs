@@ -1,4 +1,15 @@
-module Math.AAtomicPartition where
+module Math.AAtomicPartition(
+  -- * Main functions
+  isAAtomic,
+  aAtomicPartitions,
+  aAtomicBFPartitions,
+  aAtomicSBFPartitions,
+
+  -- * Implementation details
+  SubsetSums(),
+  sums2,
+  singletonSum,
+) where
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -42,18 +53,18 @@ isAAtomic :: IntSet   -- ^ A
 isAAtomic atoms parts =
     IntSet.disjoint (subsetSumsGE2 parts) atoms
 
--- | Set of sums of all subsets of a multiset of Ints
+-- | Set of sums of all submultisets of a multiset of Ints
 data SubsetSums = SubsetSums {
-    sums1 :: !IntSet, -- ^ sum of one or more parts
-    sums2 :: !IntSet  -- ^ sum of two or more parts
+    elems :: !IntSet, -- ^ set of distinct elements (= set of sums of exactly one element)
+    sums2 :: !IntSet  -- ^ set of sums of two or more elements
   }
   deriving (Show, Eq)
 
 instance Semigroup SubsetSums where
   -- Combine two underlying multisets
   SubsetSums a1 a2 <> SubsetSums b1 b2 = SubsetSums {
-      sums1 = IntSet.unions
-        [ a1, b1, a1_plus_b1 ],
+      elems = IntSet.unions
+        [ a1, b1 ],
       sums2 = IntSet.unions
         [ a2, b2, a1_plus_b1 ]
     }
@@ -184,9 +195,9 @@ aAtomicBFPartitions atoms n0 =
 --      n0    : 合計 n0
 --
 --   戻り値:
---      A-atomic かつ semi-balance-free な分割を (SemiBFとして) 全部返す。
-aAtomicSemiBFPartitions :: IntSet -> Int -> [SemiBF]
-aAtomicSemiBFPartitions atoms n0 = do
+--      A-atomic かつ semi-balance-free な分割を (SBFとして) 全部返す。
+aAtomicSBFPartitions :: IntSet -> Int -> [SBF]
+aAtomicSBFPartitions atoms n0 = do
   p' <- aAtomicBFPartitions atoms n0
   [SmallStep p'] ++ derive p'
   where
@@ -198,7 +209,7 @@ aAtomicSemiBFPartitions atoms n0 = do
     --
     -- ただし、A-atomic /\ balance-free の細分が
     -- A-atomicでないケースは存在する。それは除外しなければならない。
-    derive :: BF -> [SemiBF]
+    derive :: BF -> [SBF]
     derive (BF p') = do
       k <- [ a `div` 2 | a <- IntSet.toDescList p', even a ]
       let q = IntSet.delete (2 * k) p'

@@ -31,6 +31,7 @@ library
     Math.AAtomicPartition,
 
     Hopf,
+    HasseDiagram,
 
     Comonad.SingleLayer,
     Co,
