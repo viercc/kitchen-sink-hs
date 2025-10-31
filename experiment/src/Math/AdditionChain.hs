@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.List (sortOn)
 
 type Chain = IntMap (Int, Int)
 
@@ -195,6 +196,20 @@ solve target =
     
     lowerBound :: SolveState -> Int
     lowerBound (SolveState t k) = IntSet.size t + IntSet.size k
+
+--------
+
+minimals :: (Ord b)
+  => (a -> b)           -- measure
+  -> (a -> a -> Bool)   -- strict comparison
+  -> [a]
+  -> [a]
+-- (<<) must be a strict partial order
+-- (a << b) => (measure a < measure b)
+minimals measure (<<) = go . sortOn measure 
+  where
+    go [] = []
+    go (a:as) = a : go (filter (not . (a <<)) as)
 
 -- | Knuth's power tree
 --

@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Math.IntegerPartition.BalanceFree(
   -- * Main type and functions
   -- ** Balance-free
@@ -7,15 +8,20 @@ module Math.IntegerPartition.BalanceFree(
   sumBF, lengthBF,
   bfpartitions,
   minimalBFPartitions,
+  parentsOfBF,
   -- ** Semi-balance-free
   SBF(..),
   sumSBF, lengthSBF, prettySBF,
+  sbfToSet,
+
   sbfpartitions,
   minimalSBFPartitions,
+  parentsOfSBF,
 
   -- * Implementation details
   delta,
   updateDelta,
+  minimalOfUpperSet,
 
   -- * Visualization
   bfpartitionsDot,
@@ -26,7 +32,7 @@ module Math.IntegerPartition.BalanceFree(
 import Control.Monad (guard)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Ord (comparing, Down (..))
+import Data.Ord (comparing)
 import Data.List (sortBy)
 import qualified Data.Set as Set
 import GHC.IsList (IsList(..))
@@ -258,6 +264,10 @@ sumSBF :: SBF -> Int
 sumSBF (SmallStep p) = sumBF p
 sumSBF (BigStep k p) = 2 * k + sumBF p
 
+sbfToSet :: SBF -> IntSet
+sbfToSet (SmallStep (BF p)) = p 
+sbfToSet (BigStep k (BF p)) = IntSet.insert k p
+
 lengthBF :: BF -> Int
 lengthBF (BF p) = IntSet.size p
 
@@ -266,14 +276,21 @@ sumBF (BF p) = sum (IntSet.toList p)
 
 -----------
 
-minimalBFPartitions :: Int -> [BF]
-minimalBFPartitions = loop Set.empty . sortBy (comparing (Down . lengthBF)) . bfpartitions
+minimalOfUpperSet :: forall a. Ord a
+  => (a -> Int)       -- ^ "measure" i.e. a function f s.t. (a \prec b) implies (f a < f b)
+  -> (a -> Set.Set a) -- ^ "covering elements" of a given element in the poset
+  -> [a]              -- ^ "Upper set" (upward-closed set) of a poset
+  -> [a]              -- ^ minimal elements in the upper set
+minimalOfUpperSet measure cover = loop Set.empty . sortBy (comparing measure)
   where
-    loop :: Set.Set BF -> [BF] -> [BF]
+    loop :: Set.Set a -> [a] -> [a]
     loop _       [] = []
     loop parents (p : rest)
-      | p `Set.member` parents = loop (Set.union (parentsOfBF p) parents) rest
-      | otherwise              = p : loop (Set.union (parentsOfBF p) parents) rest
+      | p `Set.member` parents = loop (Set.union (cover p) parents) rest
+      | otherwise              = p : loop (Set.union (cover p) parents) rest
+
+minimalBFPartitions :: Int -> [BF]
+minimalBFPartitions = minimalOfUpperSet (negate . lengthBF) parentsOfBF . bfpartitions
 
 parentsOfBF :: BF -> Set.Set BF
 parentsOfBF (BF p) = Set.fromList $ do
@@ -284,13 +301,7 @@ parentsOfBF (BF p) = Set.fromList $ do
   pure $ BF $ IntSet.insert (a + b) $ IntSet.delete a $ IntSet.delete b p
 
 minimalSBFPartitions :: Int -> [SBF]
-minimalSBFPartitions = loop Set.empty . sortBy (comparing (Down . lengthSBF)) . sbfpartitions
-  where
-    loop :: Set.Set SBF -> [SBF] -> [SBF]
-    loop _       [] = []
-    loop parents (p : rest)
-      | p `Set.member` parents = loop (Set.union (parentsOfSBF p) parents) rest
-      | otherwise              = p : loop (Set.union (parentsOfSBF p) parents) rest
+minimalSBFPartitions = minimalOfUpperSet (negate . lengthSBF) parentsOfSBF . sbfpartitions
 
 parentsOfSBF :: SBF -> Set.Set SBF
 parentsOfSBF (SmallStep p) = Set.mapMonotonic SmallStep (parentsOfBF p)
