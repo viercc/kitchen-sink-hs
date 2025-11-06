@@ -305,28 +305,21 @@ minimalSBFPartitions = minimalOfUpperSet (negate . lengthSBF) parentsOfSBF . sbf
 
 parentsOfSBF :: SBF -> Set.Set SBF
 parentsOfSBF (SmallStep p) = Set.mapMonotonic SmallStep (parentsOfBF p)
-parentsOfSBF (BigStep k (BF p)) =
-    let p' = BF $ IntSet.insert (2*k) p
-    in  Set.insert (SmallStep p') $ Set.mapMonotonic (BigStep k) (parentsOfBF (BF p))
-{-
-
-ある `SBF` に対して、
-
-* `p`がbalance-free のときは`BF`と同じ。
-
-* `p = BigStep k p₀ = [k,k] ++ p₀` のとき、`p`をcoverする`q`は次のどちらか。
-
-  * `q = [2*k] ++ p₀`
-  * `p₀`をcoverする`q₀`に対して`q = [k,k] ++ q₀`。
-
-    * `l /= k` に対して `q = [l,l] + q'` とはならない。
-      実際、一方の`l`が`p`に存在する2つの部分の合併`a0+a1, [a0,a1] ⊂ p`であることはない。
-      もしそうであれば、`l = a0 + a1`は`p`がsemi-balance-freeであるための条件に反している。
-      しかし、2個の`l`が`p`にもともと含まれていることもできない。semi-balance-freeは
-      同じ値の部分のペアを高々1つしかもてず、`k`のペアがすでに存在する。
-      よってそのような`l`は存在しない。
-
--}
+parentsOfSBF (BigStep k (BF p))
+  | k `IntSet.member` p = Set.unions [mergeKK, parentsP]
+  | otherwise           = Set.unions [mergeKK, mergeKP, parentsP]
+  where
+    -- Uses 2 ks in the merge: [2*k] ++ [a0, a1, ...]
+    mergeKK = Set.singleton $ SmallStep (BF (IntSet.insert (2 * k) p))
+    -- Uses 1 ks in the merge: [k] ++ [a0, a1, ..., aj + k, ...]
+    mergeKP = Set.fromList $ do
+      let p' = IntSet.insert k p
+      j <- IntSet.toList p
+      let p'' = IntSet.insert (j + k) (IntSet.delete j p')
+      pure $ SmallStep $ BF p''
+    -- [k, k] ++ [a0, a1, ..., aj + ak, ...]
+    -- (Uses 0 or 1 ks if k ∈ p, Uses 0 otherwise)
+    parentsP = Set.mapMonotonic (BigStep k) (parentsOfBF (BF p))
 
 -------------------
 
