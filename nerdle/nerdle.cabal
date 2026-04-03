@@ -15,13 +15,13 @@ executable list-nerdle
 
 executable wordle-solver
   hs-source-dirs: wordle-solver
-  main-is: wordle-solver.hs
-  other-modules: Collection, WordleLike, Types, Util, Search
+  main-is: Main.hs
+  other-modules: Partition, WordleLike, Types, Util, Search, Option
   build-depends: base >= 4.14,
                  vector, containers, multiset,
-                 semialign,
                  reflection,
                  random,
-                 deepseq
+                 deepseq,
+                 optparse-applicative,
   ghc-options: -Wall
   default-language: Haskell2010
