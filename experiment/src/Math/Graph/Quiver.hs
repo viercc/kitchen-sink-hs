@@ -172,6 +172,7 @@ newtype Cycle = Cycle [EdgeId]
 cycleEdges :: Cycle -> [EdgeId]
 cycleEdges (Cycle es) = es
 
+--- | Separate self loops (1-cycles) from a quiver.
 eliminateSelfLoops :: Quiver -> ([Cycle], Quiver)
 eliminateSelfLoops g = (toCycle <$> selfLoops, deleteEdges selfLoops g)
   where
@@ -180,6 +181,17 @@ eliminateSelfLoops g = (toCycle <$> selfLoops, deleteEdges selfLoops g)
       [(s,s,e) | (s, te) <- IntMap.toList (vertices g)
                , e <- maybe [] IntSet.toList $ IntMap.lookup s te ]
 
+--- | Separate 2-cycles (pairs of edges of oppsite directions between two vertices)
+---   from a quiver.
+---
+---   Generally, there can be multiple edge for both @s -> t@ and @t -> s@ directions.
+---   This function makes as many as possible disjoint pairs out of
+---   multiple @s -> t@ edges and @t -> s@ edges,
+---   making arbitrary choice of how to pair them.
+---   
+---   For example, if there are three @s -> t@ edges and nine @t -> s@ edges,
+---   this function makes three 2-cycles on @s -> t -> s@, leaving six @t -> s@
+---   edges in the "residue" quiver.
 eliminate2Cycles :: Quiver -> ([Cycle], Quiver)
 eliminate2Cycles g = (toCycle <$> pairs, deleteEdges usedEdges g)
   where
@@ -193,6 +205,7 @@ eliminate2Cycles g = (toCycle <$> pairs, deleteEdges usedEdges g)
     toCycle (_,_, e1, e2) = Cycle [e1, e2]
     usedEdges = pairs >>= \(s,t,e1,e2) -> [(s,t,e1),(t,s,e2)]
 
+--- | Separate 1- or 2- cycles from a quiver.
 eliminateShortCycles :: Quiver -> ([Cycle], Quiver)
 eliminateShortCycles g =
   let (cs1, g') = eliminateSelfLoops g
@@ -214,12 +227,13 @@ eliminateShortCycles g =
 contractVertices :: Quiver -> (EdgeSubst, Quiver)
 contractVertices g = (edgeSubstAlive, Quiver vs'')
   where
+    dualG = dual g
     targets = do
       (v, we) <- IntMap.toList (vertices g)
       -- Restrict to single-out single-in case
       -- Failing pattern match in [] monad is mzero
       [(w,vwEdges)] <- pure $ IntMap.toList we
-      Just [(u,uvEdges)] <- pure $ IntMap.toList <$> IntMap.lookup v (vertices (dual g))
+      Just [(u,uvEdges)] <- pure $ IntMap.toList <$> IntMap.lookup v (vertices dualG)
       guard (IntSet.size vwEdges == IntSet.size uvEdges)
       pure (u,uvEdges,v,vwEdges,w)
     
