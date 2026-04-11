@@ -1,8 +1,8 @@
+cabal-version:       3.0
 name:                lattices
 version:             0.1.0.0
 synopsis:            Various order structures
 build-type:          Simple
-cabal-version:       >=2.0
 
 library
   hs-source-dirs:      src
