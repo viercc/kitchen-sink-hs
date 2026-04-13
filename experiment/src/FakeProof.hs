@@ -9,8 +9,9 @@
 --   - Types of two expressions around @===@ don't match
 module FakeProof(
   Equality(),
-  proof,
-  (===), byUsing,
+  proof, cong,
+
+  (===), step, byUsing, byDef,
 
   -- * Example
   exampleProof
@@ -23,13 +24,23 @@ data Equality a = Equality -- ^ Do not export this constructor
 proof :: a -> Equality a
 proof _ = Equality
 
+cong :: (a -> b) -> Equality a -> Equality b
+cong _ _ = Equality
+
 infixr 1 ===
 (===) :: a -> a -> a
 (===) = const
 
+step :: String -> a -> a
+step _ = id
+
 infix 3 `byUsing`
 byUsing :: a -> Equality b -> a
 byUsing = const
+
+infix 3 `byDef`
+byDef :: a -> b -> a
+byDef = const
 
 -- * Example
 
@@ -41,13 +52,13 @@ exampleProof xs ys = proof $
   case xs of
     [] ->
           reverse ([] ++ ys) 
-      === reverse ys
+      === reverse ys `byDef` (++)
       === reverse ys ++ []
-      === reverse ys ++ reverse []
+      === reverse ys ++ reverse [] `byDef` reverse
     (x:xs') ->
           reverse ((x:xs') ++ ys)
       === reverse (x : xs' ++ ys)
       === reverse (xs' ++ ys) ++ [x]
       === (reverse ys ++ reverse xs') ++ [x] `byUsing` exampleProof xs' ys
       === reverse ys ++ (reverse xs' ++ [x])
-      === reverse ys ++ (reverse (x:xs'))
+      === reverse ys ++ (reverse (x:xs')) `byDef` reverse
