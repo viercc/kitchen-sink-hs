@@ -17,6 +17,7 @@ module Selective.Night where
 import Prelude hiding ((.), id)
 import Control.Category
 
+-- | Function + distinguished constant
 data a -? b = Const b | Fun (a -> b)
   deriving Functor
 infixr 0 -?
@@ -32,17 +33,25 @@ instance Category (-?) where
 
 {-
 
-(Const d . bc) . ab = Const d . ab = Const d
-Const d . (bc . ab) = Const d
+[Category laws check]
 
-(Fun cd . Const c) . ab = Const (cd c)
-Fun cd . (Const c . ab) = Fun cd . Const c = Const (cd c)
+Fun id . Const a = Const (id a)  = Const a
+Fun id . Fun ab  = Fun (id . ab) = Fun ab
 
-(Fun cd . Fun bc) . Const b = Const ((cd . bc) b)
-Fun cd . (Fun bc . Const b) = Const (cd (bc b))
+Const a . Fun id                 = Const a
+Fun ab  . Fun id = Fun (ab . id) = Fun ab
 
-(Fun cd . Fun bc) . Fun ab = Fun (cd . bc . ab)
-Fun cd . (Fun bc . Fun ab) = Fun (cd . bc . ab)
+(Const d .  bc) . ab  = Const d . ab = Const d
+ Const d . (bc  . ab) = Const d
+
+(Fun cd .  Const c) . ab  = Const (cd c)
+ Fun cd . (Const c  . ab) = Fun cd . Const c = Const (cd c)
+
+(Fun cd .  Fun bc) . Const b  = Const ((cd . bc) b)
+ Fun cd . (Fun bc  . Const b) = Const (cd (bc b))
+
+(Fun cd .  Fun bc) . Fun ab  = Fun (cd . bc . ab)
+ Fun cd . (Fun bc .  Fun ab) = Fun (cd . bc . ab)
 
 -}
 
@@ -52,12 +61,13 @@ fstS = Fun fst
 sndS :: (a, b) -? b
 sndS = Fun snd
 
-umpProductS :: (z -? x) -> (z -? y) -> z -? (x, y)
-umpProductS (Const x) (Const y) = Const (x, y)
-umpProductS (Fun zx)  (Const y) = Fun $ \z -> (zx z, y)
-umpProductS (Const x) (Fun zy)  = Fun $ \z -> (x, zy z)
-umpProductS (Fun zx)  (Fun zy)  = Fun $ \z -> (zx z, zy z)
+pairS :: (z -? x) -> (z -? y) -> z -? (x, y)
+pairS (Const x) (Const y) = Const (x, y)
+pairS (Fun zx)  (Const y) = Fun $ \z -> (zx z, y)
+pairS (Const x) (Fun zy)  = Fun $ \z -> (x, zy z)
+pairS (Fun zx)  (Fun zy)  = Fun $ \z -> (zx z, zy z)
 
+-- | Forgets constness
 ($?) :: (a -? b) -> a -> b
 Const b $? _ = b
 Fun f   $? a = f a
@@ -70,8 +80,8 @@ class Applicative f => Selective f where
   (<*?) :: f (a -? b) -> f a -> f b
   (<*?) = liftS2 id
   
-  liftS2 :: (a -? b -? c) -> f a -> f b -> f c
-  liftS2 f x y = pure f <*? x <*? y
+  liftS2 :: (a -> (b -? c)) -> f a -> f b -> f c
+  liftS2 f x y = f <$> x <*? y
 
 infixl 4 <*?
 
@@ -83,7 +93,6 @@ select x y = (f <$> x) <*? y
 
 -------------------
 
-{-
 data Night f g b =
   forall a. Night (f (a -? b)) (g a)
 
@@ -92,120 +101,33 @@ instance (Functor f) => Functor (Night f g) where
 
 hbimapNight :: (forall x. f x -> f' x) -> (forall x. g x -> g' x) ->
               Night f g c -> Night f' g' c
-hbimapNight delta eta (Night fab ga) = Night (delta fab) (eta ga)
+hbimapNight trF trG (Night fab ga) = Night (trF fab) (trG ga)
 
--- is Night a monoid?
+smapNight :: Functor f => (b -? c) -> Night f g b -> Night f g c
+smapNight bc (Night fab ga) = Night ((bc .) <$> fab) ga
 
-nAssoc1 :: (Functor f) => Night f (Night g h) x -> Night (Night f g) h x
-nAssoc1 (Night fbx (Night gab ha)) =
-  Night (Night (compose' <$> fbx) gab) ha
+-- Is Night associative? No!
+
+nAssocL :: (Functor f) => Night f (Night g h) c -> Night (Night f g) h c
+nAssocL (Night fbc (Night gab ha)) =
+  Night (Night (compose' <$> fbc) gab) ha
   where
-    compose' (Const x) = Const (Const x)
-    compose' (Fun bx)  = Fun $ \ab -> bx <$> ab
+    compose' :: (b -? c) -> (a -? b) -? (a -? c)
+    compose' (Const c) = Const (Const c)
+    compose' (Fun bc)  = Fun (fmap bc)
 
-nAssoc2 :: (Functor f, Functor g) => Night (Night f g) h x -> Night f (Night g h) x
-nAssoc2 (Night (Night fabx ga) hb) = Night (f <$> fabx) (Night (g <$> ga) hb)
+nAssocR :: (Functor f, Functor g) => Night (Night f g) h x -> Night f (Night g h) x
+nAssocR (Night (Night fabc ga) hb) =
+    Night
+     (uncurry' <$> fabc)
+     (Night (Fun . (,) <$> ga) hb)
+       -- both of (ga, hb) have no data to branch const and non-const cases 
   where
-    f (Const (Const x)) = Const x
-    f abx               = Fun $ \(a,b) -> abx $? a $? b
-       -- Destroying Const-ness!
-    
-    g a = Fun ((,) a)
+    -- uncurry' collapses 2 levels of distinguished constness into 1 level
+    uncurry' :: (a -? (b -? c)) -> (a,b) -? c
+    uncurry' (Const (Const c)) = Const c
+    uncurry' (Const (Fun bc))  = Fun $ \(_,b) -> bc b
+    uncurry' (Fun abc)         = Fun $ \(a,b) -> abc a $? b
 
--}
-
-data Night f g c =
-  forall a b. Night (a -? b -? c) (f a) (g b)
-
-instance Functor (Night f g) where
-  fmap f (Night g fa gb) = Night (fmap (fmap f) g) fa gb
-
-nAssoc1 :: Night f (Night g h) x -> Night (Night f g) h x
-nAssoc1 (Night alpha fa (Night beta gb hc)) = Night gamma (Night delta fa gb) hc
-  where
-    -- alpha :: a -? tmp -? x
-    -- beta :: b -? c -? tmp
-
-    -- gamma :: (c -? x) -? c -? x
-    -- delta :: a -? b -? c -? x
-
-    gamma = id
-
-    delta = case (alpha, beta) of
-      (Const tmp_x, Const c_tmp) -> Const $ Const $ tmp_x . c_tmp
-      (Const tmp_x, Fun beta')   -> Const $ Fun $ \b -> tmp_x . beta' b
-      (Fun alpha',  Const c_tmp) -> Fun $ \a -> Const $ alpha' a . c_tmp
-      (Fun alpha',  Fun beta')   -> Fun $ \a -> Fun $ \b -> alpha' a . beta' b
-
-nAssoc2 :: Night (Night f g) h x -> Night f (Night g h) x
-nAssoc2 (Night eps (Night zeta fa gb) hc) = Night eta fa (Night theta gb hc)
-  where
-    -- eps  :: tmp -? c -? x
-    -- zeta :: a -? b -? tmp
-
-    -- eta   :: a -? (a -? x) -? x
-    -- theta :: b -? c -? a -? x
-
-    eta = Fun $ \a -> Fun ($? a)
-      -- requires fa always
-
-    theta = case (eps, zeta) of
-      (Const c_x, _)                 -> Const $ Const <$> c_x
-      (Fun eps',  Const (Const tmp)) -> Const $ Const <$> eps' tmp
-      (Fun eps',  Const (Fun b_tmp)) -> Fun $ \b -> Const <$> eps' (b_tmp b)
-      (Fun eps',  Fun zeta') ->
-        Fun $ \b -> Fun $ \c -> Fun $ \a -> eps' (zeta' a $? b) $? c
-        -- This also requires gb and hc always
-
-{-
-
-nAssoc* is associator
-
-[Isomorphism]
-  nAssoc1 . nAssoc2 = id
-  nAssoc2 . nAssoc1 = id
-
-[Pentagon Identity]
-  nAssoc2 . nAssoc2 = (id ⊗ nAssoc2) . nAssoc2 . (nAssoc2 ⊗ id)
-
-  (⊗) = hbimapNight
-
-  * Both sides of equation has type
-
-    forall x. Night (Night (Night e f) g) h x -> Night e (Night f (Night g h)) x
-
--}
-
-data FreeS f c where
-  Pure :: c -> FreeS f c
-  LiftS2 :: (a -? b -? c) -> FreeS f a -> f b -> FreeS f c
-
-instance Functor (FreeS f) where
-  fmap f (Pure c) = Pure (f c)
-  fmap f (LiftS2 g sa fb) = LiftS2 (fmap (fmap f) g) sa fb
-
-instance Applicative (FreeS f) where
-  pure = Pure
-  liftA2 = liftA2Default
-
-liftA2Default :: (Selective f) => (a -> b -> c) -> f a -> f b -> f c
-liftA2Default f = liftS2 (Fun $ \a -> Fun $ \b -> f a b)
-
-instance Selective (FreeS f) where
-  liftS2 f (Pure a) (Pure b) = Pure (f $? a $? b)
-  liftS2 f (Pure a) (LiftS2 g sx fy) = LiftS2 (fmap ((f $? a) .) g) sx fy
-  liftS2 f (LiftS2 g sx fy) (Pure b) =
-    case f of
-      Const b_c -> LiftS2 (Const (Const (b_c $? b))) sx fy
-      Fun f'    -> let f'' a = f' a $? b
-                   in LiftS2 (fmap (fmap f'') g) sx fy
-  liftS2 f sa (LiftS2 g sx fy) = LiftS2 id (liftS2 h sa sx) fy
-    where
-      -- f :: a -? b -? c
-      -- g :: x -? y -? b
-      -- h :: a -? x -? y -? c
-      h = case (f,g) of
-        (Const b_c, Const y_b) -> Const $ Const $ b_c . y_b
-        (Const b_c, Fun g')    -> Const $ Fun $ \x -> b_c . g' x
-        (Fun f',    Const y_b) -> Fun $ \a -> Const $ f' a . y_b
-        (Fun f',    Fun g')    -> Fun $ \a -> Fun $ \x -> f' a . g' x
+-- `Night (Night f g) h` exposes /strictly larger information/ about branches than
+-- `Night f (Night g h)`. Therefore, there /can not/ be any isomorphism between them!
