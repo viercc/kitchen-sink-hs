@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE DeriveTraversable #-}
 module Hopf where
@@ -11,22 +10,23 @@ import Data.Functor.Classes
 import Data.Foldable (Foldable(..))
 import Data.Functor (void)
 
--- | Hopf monoid of functors
+-- | Bimonoid of functors
 --
 -- ===== Laws
 --
 -- - @extract@ is an applicative morphism in the following sense:
 --
---     - @extract (pure a) = a@
+--     - @extract (pure a) === a@
 --
---         - This law follows from the parametricity, which implies
---           /any/ function with type @forall a. a -> a@ must be identity.
+--         - This law follows from the parametricity:
+--           /any/ definable function with type @forall a. a -> a@ must be the 
+--           identity function.
 --
---     - @extract (x <*> y) = extract x (extract y)@
+--     - @extract (x '<*>' y) === extract x (extract y)@
 --
 -- - @coapply@ is an applicative morphism
 --
---     - @coapply (pure a) = pure a = Day (pure ()) (pure ()) (\_ _ -> a)@
+--     - @coapply (pure a) === pure a = Day (pure ()) (pure ()) (\_ _ -> a)@
 --
 --         - This law follows from the @Comonoid@ law and the parametricity.
 --           
@@ -34,18 +34,38 @@ import Data.Functor (void)
 --           @coapply (pure a) = a <$ (coapply (pure ()))$.
 --           Then @coapply (pure ()) = Day (pure ()) (pure ()) (\_ _ -> ())@ is a consequence of the @Comonoid@ law.
 --
---     - @coapply (x <*> y) = coapply x <*> coapply y@
+--     - @coapply (x '<*>' y) === coapply x '<*>' coapply y@
 --
--- - @antipode@ is the "inverse" of @<*>@.
+--         - Note that the right hand side of this equation uses
+--           the @Applicative@ instance of 'Day'
 --
---     - @dap . trans1 antipode . coapply = dap . trans2 antipode . coapply = pure . extract@
-class (Applicative f, Comonoid f) => Hopf f where
+--           @
+--           instance (Applicative f, Applicative g) => Applicative (Day f g)
+--           @
+--
+--           which combines @Day (Day f g) (Day f g)@ to @Day f g@ by
+--           first reordering it to @Day (Day f f) (Day g g)@ and combine each component.
+class (Applicative f, Comonoid f) => Bimonoid f where
+  -- Bimonoid needs no methods
+
+-- | Hopf monoid of functors
+--
+-- ===== Laws
+--
+-- @antipode@ is the "inverse" of '<*>'.
+--
+-- @
+-- dap . trans1 antipode . coapply === pure . extract === dap . trans2 antipode . coapply
+-- @
+class Bimonoid f => Hopf f where
   antipode :: f a -> f a
 
+instance Monoid m => Bimonoid ((,) m)
 instance (Group g) => Hopf ((,) g) where
   antipode :: (g, a) -> (g, a)
   antipode (g1, x) = (invert g1, x)
 
+instance Monoid m => Bimonoid ((->) m)
 instance (Group g) => Hopf ((->) g) where
   antipode :: (g -> a) -> (g -> a)
   antipode x = x . invert
@@ -78,12 +98,14 @@ instance Comonoid V3 where
     where
       ix = V3 0 1 2 :: V3 Integer
 
+instance Bimonoid V3
+
 instance Hopf V3 where
   antipode (V3 x0 x1 x2) = V3 x0 x2 x1
 
 {- | Twist: non-trivial antipode instance -}
 
-data Twist a = Twist Bool (V3 a)
+data Twist a = Twist !Bool (V3 a)
   deriving (Eq, Show, Functor)
 
 instance Eq1 Twist where
@@ -106,6 +128,8 @@ instance Comonad Twist where
 instance Comonoid Twist where
   coapply (Twist b xs) = case coapply xs of
     Day ixes ixes' op -> Day (Twist b ixes) (Twist b ixes') op
+
+instance Bimonoid Twist
 
 instance Hopf Twist where
   antipode (Twist b xs) = Twist b (antiact b xs)
