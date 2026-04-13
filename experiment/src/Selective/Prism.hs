@@ -1,79 +1,106 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE RankNTypes #-}
+{- HLINT ignore "Use camelCase" -}
 module Selective.Prism where
 
 import Data.Bifunctor
 import Control.Selective
 import Control.Lens.Prism hiding (aside)
 
-swapE :: Either a b -> Either b a
-swapE = either Right Left
+-- * Alternative formulations for 'Selective' class
 
-aside :: (Selective f) => f (Either c a) -> f (a -> b) -> f (Either c b)
-aside f_cORa f_ab = select (second Left . swapE <$> f_cORa) (fmap Right <$> f_ab)
+-- ** Just Yoneda
 
-select' :: (Selective f) => f (Either a b) -> f (a -> b) -> f b
-select' f_aORb f_ab = either id id <$> aside (swapE <$> f_aORb) f_ab
+-- | > select === selectWith id id
+selectWith :: (Selective f) => (s -> Either a t) -> (r -> a -> t) -> f s -> f r -> f t
+selectWith match_s op x y = select (match_s <$> x) (op <$> y)
 
 {-
 
-select' f_aORb f_ab
- = either id id <$> aside (swapE <$> f_aORb) f_ab
- = either id id <$> select (second Left . swapE <$> swapE <$> f_aORb) (fmap Right <$> f_ab)
- = either id id <$> select (second Left <$> f_aORb) (fmap Right <$> f_ab)
-   -- free theorem
- = select (second (either id id . Left) <$> f_aORb) (fmap (either id id . Left) <$> f_ab)
- = select (second id                    <$> f_aORb) (fmap id                    <$> f_ab)
- = select f_aORb f_ab
+Free theorems:
 
-aside' f_cORa f_ab
- = select' (second Left . swapE <$> f_cORa) (fmap Right <$> f_ab)
- = either id id <$> aside (swapE . second Left . swapE <$> f_aORc) (fmap Right <$> f_ab)
- = either id id <$> aside (first Left  . swapE . swapE <$> f_aORc) (fmap Right <$> f_ab)
-   -- free theorem
- = either id id . bimap Left Right <$> aside f_aORc f_ab
- = either Left Right <$> aside f_aORc f_ab
- = aside f_aORc f_ab
+[naturality-s]
+  selectWith match_s op (h <$> x) y === selectWith (match_s . h) op x y
+
+[naturality-r]
+  selectWith match_s op x (h <$> y) === selectWith match_s (op . h) x y
+
+[naturality-t]
+  h <$> selectWith match_s op x y === selectWith (second h . match_s) ((h .) . op) x y
+
+[naturality-a]
+  selectWith (first h . match_s) op x y === selectWith match_s ((. h) . op) x y
 
 -}
 
-underS :: forall f s t a b.
-          (Selective f)
-       => APrism s t a b
-       -> f s -> f (a -> b) -> f t
-underS pr fs fab = withPrism pr k
+-- ** Emphasis on case analysis
+
+-- | Apply only on Left
+besides :: (Selective f) => f (Either a r) -> f (a -> b) -> f (Either b r)
+besides = selectWith (second Right) (Left .)
+
+-- | Recovering 'selectWith' from 'besides'
+selectWith_besides :: (Functor f)
+  => (forall a b r. f (Either a r) -> f (a -> b) -> f (Either b r))
+  -> forall s a t r. (s -> Either a t) -> (r -> a -> t) -> f s -> f r -> f t
+selectWith_besides besides' match_s op x y = nabla <$> besides' (match_s <$> x) (op <$> y)
+
+{-
+
+[selectWith -> besides -> selectWith]
+
+selectWith_besides besides match_s op x y
+ = nabla <$> besides (match_s <$> x) (op <$> y)
+ = nabla <$> selectWith (second Right) (Left .) (match_s <$> x) (op <$> y)
+ 〈naturality-s, naturality-r〉
+ = nabla <$> selectWith (second Right . match_s) ((Left .) . op) x y
+ = nabla <$> selectWith (second Right . match_s) (\r a -> Left (op r a)) x y
+ 〈naturality-t〉
+ = selectWith (second nabla . second Right . match_s) (\r a -> nabla (Left (op r a))) x y
+ = selectWith (second id . match_s) (\r a -> id (op r a)) x y
+ = selectWith match_s op x y
+
+-}
+
+-- ** Using Prism
+
+-- | 'select' but split based on a @Prism@ given
+selectP :: forall f s t a b.
+    (Selective f)
+  => APrism s t a b -> f s -> f (a -> b) -> f t
+selectP p = withPrism p k 
   where
-    k :: (b -> t) -> (s -> Either t a) -> f t
-    k inject_b match_s = either id inject_b <$> aside (match_s <$> fs) fab
+    k :: (b -> t) -> (s -> Either t a) -> f s -> f (a -> b) -> f t
+    k inject_b match_s = selectWith (swapEither . match_s) (inject_b .)
 
-aside' :: Selective f => f (Either c a) -> f (a -> b) -> f (Either c b)
-aside' f_cORa f_ab = underS _Right f_cORa f_ab
+-- | Recovering 'selectWith' from 'selectP'
+selectWith_selectP :: (Functor f)
+  => (forall s t a b. APrism s t a b -> f s -> f (a -> b) -> f t)
+  -> forall s a t r. (s -> Either a t) -> (r -> a -> t) -> f s -> f r -> f t
+selectWith_selectP selectP' match_s op x y =
+  selectP' (prism id (swapEither . match_s)) x (op <$> y)
 
 {-
 
-aside' f_cORa f_ab
- = underS _Right f_cORa f_ab
- = withPrism _Right f_cORa f_ab
- = either id inject_b <$> aside (match_s <$> f_cORa) f_ab
-     where inject_b :: b -> Either c b
-           inject_b = Right
-           match_s  :: Either c a -> Either (Either c b) a
-           match_s = first Left
- = either id Right <$> aside (first Left <$> f_cORa) f_ab
-   -- Naturality
- = either Left Right <$> aside f_cORa f_ab
- = aside f_cORa f_ab
-
-underS' pr fs fab
- = either id inject_b <$> aside' (match_s <$> fs) fab
-     where pr = prism inject_b match_s
- = either id inject_b <$> underS _Right (match_s <$> fs) fab
- = either id inject_b <$> underS (prism Right (first Left)) (match_s <$> fs) fab
-   -- Free theorem (DUBIOUS; CHECK LATER)
- = underS (prism (either id inject_b . Right) (first (either id inject_b) . first Left . match_s)) fs fab
- = underS (prism inject_b (first id . match_s)) fs fab
- = underS (prism inject_b match_s) fs fab
- = underS pr fs fab
+[selectWith -> selectP -> selectWith]
+selectWith_selectP selectP match_s op x y
+ = selectP (prism id (swapEither . match_s)) x (op <$> y)
+ = withPrism (prism id (swapEither . match_s))
+     (\inject_b match' -> selectWith (swapEither . match') (inject_b .))
+     x (op <$> y)
+ 〈withPrism/prism〉
+ = let inject_b = id
+       match' = swapEither . match_s
+   in selectWith (swapEither . match') (inject_b .) x (op <$> y)
+ = selectWith (swapEither . swapEither . match_s) id x (op <$> y)
+ = selectWith match_s id x (op <$> y)
+ 〈naturality-r〉
+ = selectWith match_s op x y
 
 -}
+
+-- * Misc
+
+-- | Codiagonal
+nabla :: Either a a -> a
+nabla = either id id
