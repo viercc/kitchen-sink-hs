@@ -1,5 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Hopf where
 
 import Data.Group
@@ -155,7 +156,7 @@ associative (x,y,z) = x <++> (y <++> z) == (x <++> y) <++> z
 
 -- ** Comonoid laws
 
-leftCounit, rightCounit, coassociative :: (Comonoid f, Eq1 f) => f String -> Bool
+leftCounit, rightCounit, coassociative :: (Comonoid f, Eq1 f, Foldable f) => f String -> Bool
 leftCounit x = erase1 (coapply x) == x
 rightCounit x = erase2 (coapply x) == x
 coassociative x = trans1 coapply (coapply x) == assoc (trans2 coapply (coapply x))
@@ -172,7 +173,7 @@ coassociative x = trans1 coapply (coapply x) == assoc (trans2 coapply (coapply x
 extractAp :: (Comonoid f, Applicative f) => (f String, f String) -> Bool
 extractAp (x,y) = extract (x <++> y) == extract x ++ extract y
 
-coapplyAp :: (Comonoid f, Applicative f, Eq1 f) => (f String, f String) -> Bool
+coapplyAp :: (Comonoid f, Applicative f, Eq1 f, Foldable f) => (f String, f String) -> Bool
 coapplyAp (x,y) = coapply (x <++> y) == coapply x <++> coapply y
 
 -- ** Antipodal
@@ -209,10 +210,27 @@ True
 -}
 
 
--- Orphan instances
-instance (Eq1 f, Eq1 g, Eq a) => Eq (Day f g a) where
+instance (Eq1 f, Foldable f, Eq1 g, Foldable g, Eq a) => Eq (Day f g a) where
   (==) = eq1
 
-instance (Eq1 f, Eq1 g) => Eq1 (Day f g) where
-  liftEq eq (Day fa gb op) (Day fa' gb' op') =
-    liftEq (\a a' -> liftEq (\b b' -> eq (op a b) (op' a' b')) gb gb') fa fa'
+instance (Eq1 f, Foldable f, Eq1 g, Foldable g) => Eq1 (Day f g) where
+  liftEq :: (c -> c' -> Bool) -> Day f g c -> Day f g c' -> Bool
+  liftEq eq (Day fa gb op) (Day fa' gb' op')
+    | null fa = boringEq fa fa' && boringEq gb gb'
+    | otherwise = liftEq eqGContents fa fa'
+        where
+          eqG = boringEq gb gb'
+          eqGContents a a' = eqG && liftEq (\b b' -> eq (op a b) (op' a' b')) (toList gb) (toList gb')
+
+instance (Foldable f, Foldable g) => Foldable (Day f g) where
+  foldr h r0 (Day fa gb op) = foldr (\a r -> foldr (h . op a) r gb) r0 fa
+  toList (Day fa gb op) = liftA2 op (toList fa) (toList gb)
+
+-- | Equality ignoring its content.
+--
+-- If @f@ had a @Functor@ instance, 'boringEq' would be
+-- equivalent to the following.
+-- 
+-- > boringEq fa fa' === (() <$ fa) == (() <$ fa')
+boringEq :: (Eq1 f) => f a -> f a' -> Bool
+boringEq = liftEq (\_ _ -> True)
