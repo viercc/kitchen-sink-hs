@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BlockArguments #-}
 module Math.ContingencyTable(
-  Table(..), tableContents,
+  Table(..),
 
   contingencyTables,
   uniqueContingencyTables,
@@ -12,12 +12,13 @@ module Math.ContingencyTable(
   latexTable
 ) where
 
-import Data.List (intercalate)
 import qualified Data.Vector.Unboxed as UV
 
 import Math.Combinatorics ( partitionsK, IntBag, subIntBags )
 import EquivalenceUtil ( uniqueUpTo )
 import qualified Data.IntMultiSet as IntBag
+
+import qualified Text.Table as Text
 
 -- |
 --
@@ -31,14 +32,6 @@ data Table a = MkTable
     entries :: UV.Vector a
   }
   deriving (Show, Eq, Ord)
-
-tableContents :: (UV.Unbox a) => Table a -> [[a]]
-tableContents table =
-    [[ tab UV.! (i * w + j) | j <- [0 .. w - 1]] | i <- [0 .. h - 1]]
-  where
-    h = numRows table
-    w = numCols table
-    tab = entries table
 
 vecToIntBag :: UV.Vector Int -> IntBag
 vecToIntBag v = IntBag.fromOccurList
@@ -140,16 +133,11 @@ uniquePointedContingencyTables h w n =
 
 -- * Pretty printing
 
-padStringTable :: [[String]] -> [[String]]
-padStringTable strCells = zipWith leftPad cellWidths <$> strCells
-  where
-    leftPad n s = replicate (n - length s) ' ' ++ s
-    cellWidths = foldr (zipWith max . fmap length) (repeat 0) strCells
+toTextTable :: (UV.Unbox a, Show a) => Table a -> Text.Table
+toTextTable (MkTable h w tab) = Text.Table h w $ \i j -> show (tab UV.! (i * w + j))
 
 pprTable :: (UV.Unbox a, Show a) => Table a -> String
-pprTable
-  = unlines . fmap unwords . padStringTable . fmap (fmap show) . tableContents
-
+pprTable = Text.prettyShowTable Text.defaultStyle . toTextTable
+      
 latexTable :: (UV.Unbox a, Show a) => Table a -> String
-latexTable
-  = intercalate " \\\\ " . fmap (intercalate " & ") . padStringTable . fmap (fmap show) . tableContents
+latexTable = Text.prettyShowTable Text.latexStyle . toTextTable

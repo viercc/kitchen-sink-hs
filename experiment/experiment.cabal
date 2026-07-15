@@ -78,6 +78,8 @@ library
 
     TreesThatGrow,
     TheseChain,
+
+    Text.Table,
   build-depends:
       base >= 4.10 && < 5
     , ghc-prim
