@@ -2,7 +2,7 @@
 module Data.Relation(
   Rel,
   lookup,
-  empty, singleton,
+  empty, singleton, insert, fromList,
   union, transpose, compose,
   transitiveClosure,
   restrict
@@ -22,6 +22,12 @@ empty = Map.empty
 
 singleton :: a -> b -> Rel a b
 singleton a b = Map.singleton a (Set.singleton b)
+
+insert :: (Ord a, Ord b) => a -> b -> Rel a b -> Rel a b
+insert a b = Map.insertWith Set.union a (Set.singleton b)
+
+fromList :: (Ord a, Ord b) => [(a,b)] -> Rel a b
+fromList = foldl' (\r (a,b) -> insert a b r) empty
 
 union :: (Ord a, Ord b) => Rel a b -> Rel a b -> Rel a b
 union = Map.unionWith Set.union

@@ -72,6 +72,8 @@ library
     Data.Functor.Derivative,
     Data.Functor.Curried,
 
+    DistanceProfile,
+
     Lang.RegularExpression,
     Lang.NFA,
     Lang.DFA,
