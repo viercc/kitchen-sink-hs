@@ -32,7 +32,7 @@ latexStyle = TablePrettyStyle {
 }
 
 prettyShowTable :: TablePrettyStyle -> Table -> String
-prettyShowTable style (Table trows tcols f) = intercalate (rowSep style) (V.toList (prettyRow <$> tab))
+prettyShowTable style (Table trows tcols f) = intercalate (rowSep style) (V.toList (prettyRow <$> tab)) ++ "\n"
   where
     tab = V.generate trows $ \i ->
       V.generate tcols $ \j ->

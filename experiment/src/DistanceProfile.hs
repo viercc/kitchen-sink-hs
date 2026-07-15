@@ -2,7 +2,7 @@
 module DistanceProfile(
 
   -- * Search logic
-  searchAll,
+  searchAll, searchAllModuloPermutation,
 
   {-
   -- ** Types in use
@@ -21,24 +21,90 @@ module DistanceProfile(
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntMultiSet as IMS
-import Data.Relation (Rel)
-import qualified Data.Relation as Rel
-import qualified Data.Vector as V
 
 import Control.Monad.State
 import Control.Monad (MonadPlus(..), forM, guard)
 import Control.Monad.Reader
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.IntSet as IntSet
-import Data.List (sortOn, sort)
-import Data.Ord (Down(..))
+import Data.List (sort)
 import qualified Data.Vector.Unboxed as UV
 import Control.Exception (assert)
 
 import Text.Table
+import Data.Set (Set)
+import EquivalenceUtil (uniqueUpTo)
 
--- * Intervals
+-- * Distance matrix
+data DM = MkDM Int (UV.Vector Int)
+  deriving (Eq, Ord, Show)
+
+makeDM :: Int -> (Int -> Int -> Int) -> DM
+makeDM n f = MkDM n $ UV.fromListN (triangular (n - 1)) dmContent
+  where
+    dmContent = do
+      j <- [0 .. n - 1]
+      i <- [0 .. j - 1]
+      pure $ f i j
+
+indexDM :: DM -> Int -> Int -> Int
+indexDM (MkDM n vec) = f
+  where
+    f i j
+      | i == j = 0
+      | 0 <= i && i < n && 0 <= j && j < n = vec UV.! (min i j + triangular (max i j - 1))
+      | otherwise = error $ "out of bounds: " ++ show (n,i,j)
+
+-- | Convert to table for pretty-printing
+prettyTable :: DM -> Table
+prettyTable dm@(MkDM n _) = Table n n (\i j -> show (indexDM dm i j))
+
+transposition :: Int -> Int -> Int -> Int
+transposition s t k
+  | k == s = t
+  | k == t = s
+  | otherwise = k
+
+permuteDM :: Int -> (Int -> Int) -> DM -> DM
+permuteDM n f = apply
+  where
+    perm = UV.fromListN (triangular (n - 1)) permList
+    permList = do
+      j <- [0 .. n - 1]
+      i <- [0 .. j - 1]
+      let i' = f i
+          j' = f j
+      pure $ min i' j' + triangular (max i' j' - 1)
+    
+    apply (MkDM n' vec)
+      | n /= n' = error $ "applying to DM of wrong size: " ++ show (n,n')
+      | otherwise = MkDM n $ UV.backpermute vec perm
+
+regularize :: DM -> DM
+regularize dm@(MkDM n _) = permuteDM n (sortingPerm UV.!) dm
+  where
+    firstRow = [ (indexDM dm 0 j, j) | j <- [0 .. n - 1] ]
+    sortingPerm = UV.fromListN n (snd <$> sort firstRow)
+
+moduloPermutation :: [Int] -> [DM] -> [DM]
+moduloPermutation profList = uniqueUpTo (shellPermGenerators n p ++ basepointChanges)
+  where
+    n = 1 + length profList
+    p = profileFromList profList
+    basepointChanges = do
+      j <- [1 .. n - 1]
+      pure $ regularize . permuteDM n (transposition 0 j)
+
+shellPermGenerators :: Int -> Profile -> [DM -> DM]
+shellPermGenerators n p =
+  let dists = IMS.toAscList p
+      sameDistSwaps =
+        [ (i,i+1) | (i,di,dj) <- zip3 [1..] dists (drop 1 dists), di == dj]
+  in permuteDM n . uncurry transposition <$> sameDistSwaps
+
+-- * Types to write search algorithms
+
+-- ** Intervals
 
 data Interval = I !Int !Int
   deriving (Eq, Ord, Show)
@@ -54,7 +120,35 @@ intersectInterval (I xLo xHi) (I yLo yHi)
     lo = max xLo yLo
     hi = min xHi yHi
 
--- Symmetric matrix
+-- | Narrows down 3 ranges of edge lengths using triangle inequality
+narrow :: (Interval, Interval, Interval) -> Maybe (Interval, Interval, Interval)
+narrow (xs, ys, zs) =
+  (,,) <$> narrowOne (xs, ys, zs)
+       <*> narrowOne (ys, zs, xs)
+       <*> narrowOne (zs, xs, ys)
+
+-- | Narrow x range using triangle inequality
+narrowOne :: (Interval, Interval, Interval) -> Maybe Interval
+narrowOne (xs, I yLo yHi, I zLo zHi)
+  -- Precondition: (0 <= xLo <= xHi), (0 <= yLo <= yHi), (0 <= zLo <= zHi)
+  = intersectInterval xs (I gap top)
+  where
+    -- Pair (y,z) moves inside [yLo .. yHi] × [zLo .. zHi].
+    -- A valid value of x must be in the union of the interval
+    -- coming from triangle inequality
+    --
+    -- |y - z| <= x <= y + z
+    --
+    -- for each choice of (y,z). therefore
+    --
+    -- gap = minimum [ abs (y - z) | y <- [yLo .. yHi], z <- [zLo .. zHi] ]
+    -- top = maximum [ y + z | y <- [yLo .. yHi], z <- [zLo .. zHi] ]
+    -- 
+    -- and x ∈ [xLo .. xHi] ∩ [gap .. top].
+    gap = max 0 (max (zLo - yHi) (yLo - zHi))
+    top = yHi + zHi
+
+-- ** Symmetric matrix
 data SymMat a = SymMat { matElems :: !(IntMap a), matDefault :: !a }
   deriving (Eq, Ord, Show)
 
@@ -76,7 +170,7 @@ set (i,j) val dm
   where
     key = min i j + triangular (max i j)
 
--- * Distance profile
+-- ** Distance profile
 type Profile = IMS.IntMultiSet
 
 profileFromList :: [Int] -> Profile
@@ -84,65 +178,42 @@ profileFromList ds
   | all (> 0) ds = IMS.fromList ds
   | otherwise = error "invalid profile"
 
--- Search
+-- * Search Monad
 type SearchM = ReaderT SearchCtx (StateT SearchState [])
-type SearchCtx = V.Vector Triangle
+type SearchCtx = Int -- the number of points
 data SearchState = SearchState {
+    -- | Set of edges not yet committed to a single value.
+    uncomitted :: Set (Int, Int),
+    -- | Possible distances, managed as intervals.
+    --   For a commited edge, the interval is the singleton interval (I d d). 
     distRange :: SymMat Interval,
-    remainProfile :: IntMap Profile,
-    blockers :: Blocker
+    -- | Multiset of distances from each vertex,
+    --   not yet used by commited edges.
+    remainProfile :: IntMap Profile
   }
   deriving Show
 
-type Blocker = Rel (Int,Int) Int
-type Triangle = (Int, Int, Int)
-
-allTriangles :: Int -> V.Vector Triangle
-allTriangles n = V.fromList $ do
-  i <- [0 .. n - 1]
-  j <- [i + 1 .. n - 1]
-  k <- [j + 1 .. n - 1]
-  pure (i,j,k)
-
-searchAll :: [Int] -> [DM]
-searchAll profList = do
-  let n = 1 + length profList
-      p = profileFromList profList
-      firstRow = [((0,j), I d d) | (j, d) <- zip [1..] (sort profList)]
-  dist <- runSearchM n p $ do
-    enterAll firstRow
-    solveLoop
-  pure $ makeDM n dist
-
 runSearchM :: Int -> Profile -> SearchM () -> [SymMat Interval]
-runSearchM n p m = distRange <$> execStateT (runReaderT m ctx) state0
+runSearchM n profile body = distRange <$> execStateT (runReaderT body ctx) state0
   where
-    (ctx, state0) = initialState n p
-
-initialState :: Int -> Profile -> (SearchCtx, SearchState)
-initialState n profile = (trigs, state0)
-  where
-    trigs = allTriangles n
     initialRange = I (IMS.findMin profile) (IMS.findMax profile)
+    allEdges = Set.fromList [ (i,j) | i <- [0 .. n - 1], j <- [i + 1 .. n - 1] ]
+    
+    ctx = n
     state0 = SearchState{
+      uncomitted = allEdges,
       distRange = newMat initialRange,
       remainProfile = IntMap.fromDistinctAscList
-        [ (i, profile) | i <- [0 .. n - 1]],
-      blockers = initialBlockers
+        [ (i, profile) | i <- [0 .. n - 1]]
     }
-    initialBlockers
-      | isSingleton initialRange = Rel.empty
-      | otherwise = Rel.fromList [
-          (v, key) | (key, (i,j,k)) <- V.toList (V.indexed trigs), v <- [(i,j), (i,k), (j,k)]
-        ]
 
 getDistRange :: (Int,Int) -> SearchM Interval
 getDistRange ij = gets (dGet ij . distRange)
-
-dGet :: (Int,Int) -> SymMat Interval -> Interval
-dGet (i,j) dm
-  | i == j = I 0 0
-  | otherwise = at (i,j) dm
+  where
+    -- same to @at (i,j)@ except it returns @I 0 0@ for diagonal
+    dGet (i,j) dm
+      | i == j = I 0 0
+      | otherwise = at (i,j) dm
 
 putDistRange :: (Int,Int) -> Interval -> SearchM ()
 putDistRange ij val = do
@@ -150,12 +221,46 @@ putDistRange ij val = do
     let !dist' = set ij val (distRange st)
     in st{ distRange = dist'}
 
+-- ** Main search logic
+
+searchAll :: [Int] -> [DM]
+searchAll profList
+  -- Degenerate case: profile is empty; there's only one point
+  | n == 1 = pure $ makeDM 1 (\_ _ -> 0)
+  -- Degenerate case 2:
+  --   profile is @n - 1@ equal distances; the result is unique
+  | IMS.distinctSize p == 1 = 
+      pure $ let d0 = IMS.findMin p in makeDM n (\_ _ -> d0)
+  | otherwise = do
+      let firstRow = [((0,j), I d d) | (j, d) <- zip [1..] (sort profList)]
+      dist <- runSearchM n p $ do
+        enterAll firstRow
+        solveLoop
+        validateFinalState
+      let dm = makeDM n (\i j -> getLo $ at (i,j) dist)
+      assert (checkProfile dm) pure dm
+  where
+    n = 1 + length profList
+    p = profileFromList profList
+    getLo (I lo _) = lo
+
+    checkProfile dm = all (== p) $ do
+      i <- [0 .. n - 1]
+      let distanceList = [ indexDM dm i j | j <- [0 .. n - 1], i /= j]
+      pure $ profileFromList distanceList
+
+searchAllModuloPermutation :: [Int] -> [DM]
+searchAllModuloPermutation profList = moduloPermutation profList (searchAll profList)
+
+-- | Add constraints and propagate them until it converges
 enterAll :: [((Int,Int),Interval)] -> SearchM ()
 enterAll [] = pure ()
 enterAll (def : defs) = do
   newDefs <- enter def
   enterAll (newDefs ++ defs)
 
+-- | Add new constraint that the distance of edge (i,j) must be included in
+--   an @xRange@, then propagate the change.
 enter :: ((Int,Int),Interval) -> SearchM [((Int,Int),Interval)]
 enter (ij, xRange) = do
   xRange0 <- getDistRange ij
@@ -164,15 +269,22 @@ enter (ij, xRange) = do
     then pure []
     else do
       putDistRange ij xRange'
-      if isSingleton xRange'
-        then do
-          let I d _ = xRange'
-          commit ij d
-          unblock ij
-        else pure []
+      if isSingleton xRange' then do
+        let I d _ = xRange'
+        commit ij d
+        propagate ij
+      else pure []
 
+-- | Distance of edge (i,j) is fixed to d and record (i,j) to be already committed.
+--   Take d out from the multisets of "remaining" distances for both i and j.
+--   Fail if d was not in both of the multisets.
 commit :: (Int,Int) -> Int -> SearchM ()
 commit (i,j) d = do
+  -- Delete from uncomitted edges
+  modify' $ \st -> st{
+      uncomitted = Set.delete (min i j, max i j) (uncomitted st)
+    }
+  -- Update remaining distance profiles
   profs <- gets remainProfile
   let p = profs IntMap.! i
       q = profs IntMap.! j
@@ -181,17 +293,17 @@ commit (i,j) d = do
   let p' = IMS.delete d p
       q' = IMS.delete d q
       profs' = IntMap.insert i p' (IntMap.insert j q' profs)
-  modify' $ \st -> st{ remainProfile = profs' }
+  modify' $ \st -> st{
+      remainProfile = profs'
+    }
 
-keyToTriangle :: Int -> SearchM Triangle
-keyToTriangle key = asks (V.! key)
-
-unblock :: (Int,Int) -> SearchM [((Int,Int), Interval)]
-unblock unblockEdge = do
-  blockers0 <- gets blockers
-  let updatedConstraints = Rel.lookup unblockEdge blockers0
-  updateResults <- forM (Set.toList updatedConstraints) $ \key -> do
-    (i,j,k) <- keyToTriangle key
+-- | For an edge (i,j), check each triangle inequalities containing (i,j)
+--   to narrow down ranges for all relevant edges.
+propagate :: (Int,Int) -> SearchM [((Int,Int), Interval)]
+propagate (i,j) = do
+  n <- ask
+  let thirdVertices = [ k | k <- [0 .. n - 1], i /= k, j /= k ]
+  updateResults <- forM thirdVertices $ \k -> do
     {-
        i
     x / \ y
@@ -202,24 +314,11 @@ unblock unblockEdge = do
     yRange <- getDistRange (i,k)
     zRange <- getDistRange (j,k)
     Just (xRange', yRange', zRange') <- pure $ narrow (xRange, yRange, zRange)
-    let changes =
-             [ ((i,j),xRange'), ((i,k),yRange'), ((j,k),zRange') ]
-        resolved = triangleInequalityAlways (xRange', yRange', zRange')
-        key' | resolved = Nothing
-             | otherwise = Just key
-    pure (key', changes)
-  let newBlockers = Rel.fromList [ (edge, key)
-        | (Just key, changes) <- updateResults,
-          (edge, range) <- changes,
-          not (isSingleton range) ]
-      allChanges = updateResults >>= snd
-      blockers' = Rel.union (Map.delete unblockEdge blockers0) newBlockers
-  modify' $ \st -> st{ blockers = blockers'}
-  pure allChanges
+    pure [ ((i,j),xRange'), ((i,k),yRange'), ((j,k),zRange') ]
+  pure (concat updateResults)
 
-choose :: (Foldable t, MonadPlus m) => t a -> m a
-choose = foldr (\a r -> pure a `mplus` r) mzero
-
+-- | Guesses the distance of the edge.
+--   (This function is the only branching in the search algorithm)
 guess :: (Int,Int) -> SearchM Int
 guess (i,j) = do
   profs <- gets remainProfile
@@ -230,107 +329,35 @@ guess (i,j) = do
 
 solveLoop :: SearchM ()
 solveLoop = do
-  blockers0 <- gets blockers
-  case getLargestBlocker blockers0 of
+  edges <- gets uncomitted
+  case Set.lookupMin edges of
     Just ij -> do
       d <- guess ij
       enterAll [(ij, I d d)]
       solveLoop
     Nothing -> pure ()
 
-getLargestBlocker :: Blocker -> Maybe (Int,Int)
-getLargestBlocker b = case blockerList of
-  [] -> Nothing
-  (ij, _) : _ -> Just ij
+validateFinalState :: SearchM ()
+validateFinalState = ask >>= \n -> get >>= \st -> checks n st (pure ())
   where
-    blockerList = sortOn (Down . Set.size . snd) $ Map.toList b
+    checks n st =
+      assert (allRemainingProfilesAreEmpty (remainProfile st)) .
+      assert (allRangesAreSingleton n (distRange st))
+    allRemainingProfilesAreEmpty = all IMS.null
+    allRangesAreSingleton n dist =
+      all (\ij -> isSingleton (at ij dist)) allEdges
+      where
+        allEdges = [(i,j) | i <- [0 .. n - 1], j <- [i + 1 .. n - 1]]
 
--- Triangle inequality unconditionally hold for the given range
-triangleInequalityAlways :: (Interval, Interval, Interval) -> Bool
-triangleInequalityAlways (I xLo xHi, I yLo yHi, I zLo zHi) =
-  -- Precondition: (0 <= xLo <= xHi), (0 <= yLo <= yHi), (0 <= zLo <= zHi)
-  gap <= xLo && xHi <= top
-  where
-    -- gap = maximum [ abs (y - z) | y <- [yLo .. yHi], z <- [zLo .. zHi] ]
-    gap = max (abs (yHi - zLo)) (abs (zHi - yLo))
-    -- top = minimum [ y + z | y <- [yLo .. yHi], z <- [zLo .. zHi] ]
-    top = yLo + zLo
-
-narrow :: (Interval, Interval, Interval) -> Maybe (Interval, Interval, Interval)
-narrow (xs, ys, zs) =
-  (,,) <$> narrowOne (xs, ys, zs)
-       <*> narrowOne (ys, zs, xs)
-       <*> narrowOne (zs, xs, ys)
-
--- Narrow x range using triangle inequality
-narrowOne :: (Interval, Interval, Interval) -> Maybe Interval
-narrowOne (xs, I yLo yHi, I zLo zHi)
-  -- Precondition: (0 <= xLo <= xHi), (0 <= yLo <= yHi), (0 <= zLo <= zHi)
-  = intersectInterval xs (I gap top)
-  where
-    -- Pair (y,z) moves inside [yLo .. yHi] × [zLo .. zHi].
-    -- A valid value of x must be in the union of the interval
-    -- coming from triangle inequality
-    --
-    -- |y - z| <= x <= y + z
-    --
-    -- for each choice of (y,z). therefore
-    --
-    -- gap = minimum [ abs (y - z) | y <- [yLo .. yHi], z <- [zLo .. zHi] ]
-    -- top = maximum [ y + z | y <- [yLo .. yHi], z <- [zLo .. zHi] ]
-    -- 
-    -- and x ∈ [xLo .. xHi] ∩ [gap .. top].
-    gap = max 0 (max (zLo - yHi) (yLo - zHi))
-    top = yHi + zHi
-
--- example profiles
+-- * example profiles
 squareProf, rectProf, cubeProf, cube4Prof :: [Int]
 squareProf = [1,1,2]
 rectProf = [1,2,3]
 cubeProf = replicate 3 1 ++ replicate 3 2 ++ [3]
 cube4Prof = replicate 4 1 ++ replicate 6 2 ++ replicate 4 3 ++ [4]
 
-----
+-- * Utility
 
--- "Frozen" distance matrix
-data DM = MkDM Int (UV.Vector Int)
-  deriving (Eq, Ord, Show)
+choose :: (Foldable t, MonadPlus m) => t a -> m a
+choose = foldr (\a r -> pure a `mplus` r) mzero
 
-makeDM :: Int -> SymMat Interval -> DM
-makeDM n dm = MkDM n $ UV.fromListN (triangular (n - 1)) dmContent
-  where
-    dmContent = do
-      j <- [0 .. n - 1]
-      i <- [0 .. j - 1]
-      let I lo hi = at (i,j) dm
-      assert (lo == hi) $ pure lo
-
--- | Convert to table for pretty-printing
-prettyTable :: DM -> Table
-prettyTable (MkDM n vec) = Table n n f
-  where
-    f i j
-      | i == j = "0"
-      | otherwise = show $ vec UV.! (min i j + triangular (max i j - 1))
-
-transposeDM :: Int -> Int -> Int -> DM -> DM
-transposeDM n s t
-  | s < 0 || t < 0 || s >= n || t >= n = error $ "out of bounds: " ++ show (n,s,t)
-  | s == t = id
-  | otherwise = apply
-  where
-    tr k
-      | k == s = t
-      | k == t = s
-      | otherwise = k
-    perm = UV.fromListN (triangular (n - 1)) permList
-    permList = do
-      j <- [0 .. n - 1]
-      i <- [0 .. j - 1]
-      let i' = tr i
-          j' = tr j
-      pure $ min i' j' + triangular (max i' j' - 1)
-    
-    apply (MkDM n' vec)
-      | n /= n' = error $ "applying to DM of wrong size: " ++ show (n,n')
-      | otherwise = MkDM n $ UV.backpermute vec perm
