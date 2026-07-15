@@ -5,7 +5,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Math.DyckWord where
 
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import Data.Equivalence.Monad
