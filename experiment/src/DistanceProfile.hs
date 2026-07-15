@@ -252,15 +252,20 @@ searchAll profList
 searchAllModuloPermutation :: [Int] -> [DM]
 searchAllModuloPermutation profList = moduloPermutation profList (searchAll profList)
 
--- | Add constraints and propagate them until it converges
+-- | Add constraints using @enter@ and recursively process newly derived
+-- constraints until no further constraints are produced.
 enterAll :: [((Int,Int),Interval)] -> SearchM ()
 enterAll [] = pure ()
 enterAll (def : defs) = do
   newDefs <- enter def
   enterAll (newDefs ++ defs)
 
--- | Add new constraint that the distance of edge (i,j) must be included in
---   an @xRange@, then propagate the change.
+-- | Add constraint and returns new constraints gained by propagation.
+--
+-- When an edge becomes committed to a single distance, propagate triangle
+-- inequalities involving that edge. Narrowing to a non-singleton interval
+-- is deliberately not propagated further: doing so reaches a stronger
+-- fixpoint, but was substantially slower for the intended search inputs.
 enter :: ((Int,Int),Interval) -> SearchM [((Int,Int),Interval)]
 enter (ij, xRange) = do
   xRange0 <- getDistRange ij
@@ -316,6 +321,11 @@ propagate (i,j) = do
     Just (xRange', yRange', zRange') <- pure $ narrow (xRange, yRange, zRange)
     pure [ ((i,j),xRange'), ((i,k),yRange'), ((j,k),zRange') ]
   pure (concat updateResults)
+
+-- [Note]
+-- Currently, @propagate@ is called only for edges narrowed down to singleton,
+-- but @propagate@ itself works without the assumption the edge triggered it
+-- is singleton.
 
 -- | Guesses the distance of the edge.
 --   (This function is the only branching in the search algorithm)
