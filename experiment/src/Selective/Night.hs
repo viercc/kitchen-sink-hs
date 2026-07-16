@@ -12,10 +12,12 @@ https://www.reddit.com/r/haskell/comments/axje88/selective_applicative_functors/
 {-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DefaultSignatures #-}
 module Selective.Night where
 
 import Prelude hiding ((.), id)
 import Control.Category
+import Control.Selective
 
 -- | Function + distinguished constant
 data a -? b = Const b | Fun (a -> b)
@@ -31,42 +33,6 @@ instance Category (-?) where
   id = Fun id
   (.) = composeS
 
-{-
-
-[Category laws check]
-
-Fun id . Const a = Const (id a)  = Const a
-Fun id . Fun ab  = Fun (id . ab) = Fun ab
-
-Const a . Fun id                 = Const a
-Fun ab  . Fun id = Fun (ab . id) = Fun ab
-
-(Const d .  bc) . ab  = Const d . ab = Const d
- Const d . (bc  . ab) = Const d
-
-(Fun cd .  Const c) . ab  = Const (cd c)
- Fun cd . (Const c  . ab) = Fun cd . Const c = Const (cd c)
-
-(Fun cd .  Fun bc) . Const b  = Const ((cd . bc) b)
- Fun cd . (Fun bc  . Const b) = Const (cd (bc b))
-
-(Fun cd .  Fun bc) . Fun ab  = Fun (cd . bc . ab)
- Fun cd . (Fun bc .  Fun ab) = Fun (cd . bc . ab)
-
--}
-
-fstS :: (a, b) -? a
-fstS = Fun fst
-
-sndS :: (a, b) -? b
-sndS = Fun snd
-
-pairS :: (z -? x) -> (z -? y) -> z -? (x, y)
-pairS (Const x) (Const y) = Const (x, y)
-pairS (Fun zx)  (Const y) = Fun $ \z -> (zx z, y)
-pairS (Const x) (Fun zy)  = Fun $ \z -> (x, zy z)
-pairS (Fun zx)  (Fun zy)  = Fun $ \z -> (zx z, zy z)
-
 -- | Forgets constness
 ($?) :: (a -? b) -> a -> b
 Const b $? _ = b
@@ -76,25 +42,46 @@ infixl 9 $?
 
 -----------------
 
-class Applicative f => Selective f where
-  (<*?) :: f (a -? b) -> f a -> f b
-  (<*?) = liftS2 id
-  
-  liftS2 :: (a -> (b -? c)) -> f a -> f b -> f c
-  liftS2 f x y = f <$> x <*? y
+-- | Alternative formulation of @Selective@
+--   using @(-?)@
+class Applicative f => Selective' f where
+  (?*>) :: f (a -? b) -> f a -> f b
+  default (?*>) :: Selective f => f (a -? b) -> f a -> f b
+  (?*>) = sapDefault
 
-infixl 4 <*?
+liftS2 :: Selective' f => (a -> (b -? c)) -> f a -> f b -> f c
+liftS2 f x y = f <$> x ?*> y
 
-select :: (Selective f) => f (Either a b) -> f (a -> b) -> f b
-select x y = (f <$> x) <*? y
+infixl 4 ?*>
+
+-- ** 'Selective' and 'Selective'' can be defined in terms of each other
+
+sapDefault :: (Selective f) => f (a -? b) -> f a -> f b
+sapDefault x y = select (toEither <$> x) (flip ($) <$> y)
+  where
+    toEither (Const b) = Right b
+    toEither (Fun f)   = Left f
+
+selectDefault :: (Selective' f) => f (Either a b) -> f (a -> b) -> f b
+selectDefault x y = (f <$> x) ?*> y
   where
     f (Left a) = Fun ($ a)
     f (Right b) = Const b
 
--------------------
+-- * Is there a monoidal product to regard @Selective'@ as a monoid?
+-- 
+-- @Applicative f@ can be understood as a monoid object on monoidal category of @Functor@s
+-- with @Day@ as its monoidal product.
+-- Can the same thing be done for @Selective'@?
 
+-- | The type of @(?*>)@, @forall a b. f (a -? b) -> f a -> f b@,
+--   is isomorphic to @forall b. Night f f b -> f b@
 data Night f g b =
   forall a. Night (f (a -? b)) (g a)
+
+-- | @Night@ ap
+nap :: Selective' f => Night f f b -> f b
+nap (Night x y) = x ?*> y
 
 instance (Functor f) => Functor (Night f g) where
   fmap f (Night fab ga) = Night (fmap (fmap f) fab) ga
@@ -106,7 +93,7 @@ hbimapNight trF trG (Night fab ga) = Night (trF fab) (trG ga)
 smapNight :: Functor f => (b -? c) -> Night f g b -> Night f g c
 smapNight bc (Night fab ga) = Night ((bc .) <$> fab) ga
 
--- Is Night associative? No!
+-- ** Night is not associative!
 
 nAssocL :: (Functor f) => Night f (Night g h) c -> Night (Night f g) h c
 nAssocL (Night fbc (Night gab ha)) =
